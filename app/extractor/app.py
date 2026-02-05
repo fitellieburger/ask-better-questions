@@ -366,6 +366,12 @@ def guess_story_links(html: str, base_url: str) -> List[LinkCandidate]:
     return links[:8]
 
 
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+
 @app.post("/extract", response_model=ExtractResponse)
 async def extract(req: ExtractRequest, request: Request) -> ExtractResponse:
 
