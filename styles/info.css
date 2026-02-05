@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  line-height: 1.45;
+}
+
+.wrap {
+  max-width: 860px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+/* Make the info card feel like a result card */
+.infoCard {
+  margin-top: 14px;
+}
+
+.infoSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.infoP {
+  margin: 10px 0;
+}
+
+.infoList {
+  margin: 10px 0 0 0;
+  padding-left: 18px;
+}
+
+.infoRule {
+  border: 0;
+  border-top: 1px solid var(--vox-border);
+  opacity: 0.6;
+  margin: 14px 0;
+}
+
+.h1 { margin: 0 0 8px; font-size: 1.1rem; }
+.h2 { margin: 12px 0 6px; font-size: 0.95rem; }
+.p  { margin: 8px 0; opacity: 0.92; }
+.list { margin: 8px 0 0; padding-left: 18px; }
+.rule { border: 0; border-top: 1px solid rgba(0,0,0,0.10); margin: 14px 0; }
+
+@media (prefers-color-scheme: dark) {
+  .rule { border-top-color: rgba(255,255,255,0.12); }
+}
+
+/* Info button + "what is this?" card
+   - Uses your existing .vox-card look
+   - Designed to feel like an expanded results card
+*/
+
+.infoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--vox-border);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.infoBtn:hover {
+  opacity: 1;
+}
+
+.infoBtn:focus-visible {
+  outline: 2px solid rgba(255, 215, 0, 0.45);
+  outline-offset: 2px;
+}

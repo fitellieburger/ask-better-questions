@@ -1,0 +1,40 @@
+/* styles/base.css
+   Reset + global typography */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--vox-bg);
+  color: var(--vox-fg);
+  font-family: var(--font-main);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-header);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button, input, textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 10px;
+}

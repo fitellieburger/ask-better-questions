@@ -1,0 +1,278 @@
+/* styles/components.css
+   Cards, inputs, tabs, results */
+
+.highlight-yellow {
+  background: var(--vox-yellow);
+  padding: 0 4px;
+  font-weight: 800;
+}
+
+/* ---------- Cards ---------- */
+
+.vox-card {
+  background: var(--vox-card);
+  border-left: 5px solid var(--vox-yellow);
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: var(--vox-shadow);
+}
+
+/* Add breathing room when a card precedes the input */
+.vox-card + .input-card {
+  margin-top: 16px;
+}
+
+/* Input card keeps tabs clipped to rounded edges */
+.input-card {
+  background: var(--vox-card);
+  border: 1px solid var(--vox-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--vox-shadow);
+  overflow: hidden; /* keep tab row clean */
+  width: 100%;
+}
+
+/* Body area can be visible; clipping is controlled by .input-card */
+.input-body {
+  padding: 16px;
+}
+
+/* ---------- Input tabs (Paste / Link) ---------- */
+
+.input-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: rgba(0,0,0,0.04);
+  border-bottom: 1px solid var(--vox-border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .input-tabs {
+    background: rgba(255,255,255,0.06);
+  }
+}
+
+.input-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--vox-fg);
+  padding: 10px 12px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  opacity: 0.78;
+}
+
+/* ✅ FIX: active vs inactive styles were flipped in your earlier CSS.
+   Active tab should look "selected". */
+.input-tab.active {
+  opacity: 1;
+  background: var(--vox-card);
+  box-shadow: inset 0 -3px 0 var(--vox-yellow);
+}
+
+.input-tab:not(.active) {
+  opacity: 0.70;
+  background: transparent;
+}
+
+/* ---------- Inputs ---------- */
+
+.article-input,
+.url-input {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+
+  background: var(--vox-input);
+  color: var(--vox-fg);
+
+  border: 1px solid var(--vox-border);
+  border-radius: var(--radius-input);
+
+  padding: 12px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+/* Prevent textarea from visually "escaping" the card on some browsers */
+.article-input {
+  resize: vertical;
+  min-height: 220px;
+}
+
+/* ---------- Buttons / pills ---------- */
+
+.primary-button {
+  padding: 10px 14px;
+  background: var(--vox-yellow);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Output mode tabs */
+.mode-tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tab {
+  background: var(--vox-card);
+  color: var(--vox-fg);
+  border: 1px solid var(--vox-border);
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 800;
+  opacity: 0.88;
+}
+
+.tab:hover {
+  opacity: 1;
+}
+
+.tab.active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(255,215,0,0.25);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab.active {
+    box-shadow: 0 0 0 2px rgba(255,215,0,0.22);
+  }
+}
+
+/* Chosen URL button */
+.open-link {
+  margin-left: auto; /* push to far right */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+
+  background: var(--vox-yellow);
+  color: #111;
+  border: 1px solid rgba(0,0,0,0.08);
+
+  font-size: 0.85rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.open-link:hover {
+  filter: brightness(0.98);
+}
+
+@media (prefers-color-scheme: dark) {
+  .open-link {
+    border-color: rgba(255,255,255,0.12);
+  }
+}
+
+/* ---------- Actions row ---------- */
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* ✅ Prevent flex children (status text, meter) from forcing overflow */
+.action-row > * {
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .input-body {
+    padding: 12px;
+  }
+  .article-input {
+    min-height: 180px;
+  }
+}
+
+/* Status / error */
+.status-slot {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px; /* prevents layout jump */
+}
+
+.status-text {
+  font-size: 0.8rem;
+  opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Errors */
+.error-box {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--vox-border);
+  background: var(--vox-card);
+  border-radius: 12px;
+}
+
+/* ---------- Results ---------- */
+
+.results {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+/* details summary chevron */
+details summary {
+  cursor: pointer;
+}
+
+.summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary::after {
+  content: "▾";
+  float: right;
+  opacity: 0.6;
+}
+
+details[open] .summary::after {
+  content: "▴";
+}
+
+/* ✅ Caption spacing fix */
+.caption {
+  color: var(--vox-muted);
+  border-left: 2px solid var(--vox-border);
+
+  padding-left: 12px;  /* space from rule */
+  padding-top: 6px;    /* a little top padding */
+  margin-top: 10px;    /* separates from summary */
+  line-height: 1.45;
+}

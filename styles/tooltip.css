@@ -1,0 +1,68 @@
+/* styles/tooltip.css
+   Tooltips / help microcopy */
+
+.help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.helpTarget {
+  outline: none;
+}
+
+/* ---------- Inline tooltip (may CLIP inside overflow-hidden parents) ---------- */
+.tooltip {
+  position: absolute;
+  left: 0;
+  bottom: 125%;
+  width: 260px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--vox-border);
+  background: var(--vox-card);
+  box-shadow: var(--vox-shadow);
+  font-size: 13px;
+  line-height: 1.35;
+
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 50;
+
+  /* If you ever DO want line breaks, use pre-line and insert \A in content.
+     You said you don't want extra lines, so normal is fine. */
+  white-space: normal;
+}
+
+.help:hover .tooltip,
+.help:focus-within .tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ---------- Fixed bubble tooltip (recommended: WILL NOT CLIP) ----------
+   Use this when tooltips were getting clipped by .input-card overflow.
+
+   This assumes you position it from JS (mouse position) OR you place it
+   with inline styles. The CSS just defines the look. */
+.tooltipBubble {
+  position: fixed;
+  z-index: 9999;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.3;
+
+  background: var(--vox-card);
+  color: var(--vox-fg);
+  border: 1px solid var(--vox-border);
+  box-shadow: var(--vox-shadow);
+
+  pointer-events: none; /* never steals hover/click */
+  white-space: normal;
+}

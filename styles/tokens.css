@@ -1,0 +1,65 @@
+/* styles/tokens.css
+   Design tokens + themes */
+
+:root {
+  /* Brand */
+  --vox-yellow: #FFD700;
+
+  /* Legacy base colors (still useful) */
+  --vox-dark: #1A1A1A;
+  --vox-light: #F4F4F4;
+
+  /* Fonts */
+  --font-main: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-header: 'Helvetica Neue Bold', Helvetica, Arial, sans-serif;
+
+  /* Theme tokens (light defaults) */
+  --vox-bg: var(--vox-light);
+  --vox-fg: var(--vox-dark);
+  --vox-card: #ffffff;
+  --vox-border: rgba(0,0,0,0.12);
+  --vox-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+  --vox-muted: rgba(0,0,0,0.65);
+  --vox-input: #ffffff;
+
+  /* UI polish */
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --radius-input: 12px;
+
+  --focus-ring: 0 0 0 3px rgba(255, 215, 0, 0.30);
+}
+
+/* Auto dark mode (OS setting) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --vox-bg: #0f0f10;
+    --vox-fg: #f2f2f2;
+    --vox-card: #17181a;
+    --vox-border: rgba(255,255,255,0.14);
+    --vox-shadow: 0 8px 22px rgba(0,0,0,0.45);
+    --vox-muted: rgba(255,255,255,0.72);
+    --vox-input: #121315;
+  }
+}
+
+/* Optional manual override later:
+   set <html data-theme="dark"> or "light" */
+html[data-theme="dark"] {
+  --vox-bg: #0f0f10;
+  --vox-fg: #f2f2f2;
+  --vox-card: #17181a;
+  --vox-border: rgba(255,255,255,0.14);
+  --vox-shadow: 0 8px 22px rgba(0,0,0,0.45);
+  --vox-muted: rgba(255,255,255,0.72);
+  --vox-input: #121315;
+}
+html[data-theme="light"] {
+  --vox-bg: var(--vox-light);
+  --vox-fg: var(--vox-dark);
+  --vox-card: #ffffff;
+  --vox-border: rgba(0,0,0,0.12);
+  --vox-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+  --vox-muted: rgba(0,0,0,0.65);
+  --vox-input: #ffffff;
+}
