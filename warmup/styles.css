@@ -1,0 +1,396 @@
+/* ===============================
+   Vars + base typography
+   =============================== */
+
+:root {
+  --bg: #fbfbf9;
+  --card: #ffffff;
+  --text: #1f2328;
+  --muted: #5b6672;
+  --hair: rgba(31, 35, 40, 0.10);
+  --shadow: 0 18px 60px rgba(0,0,0,0.08);
+  --radius: 18px;
+
+  --font-main: Georgia, "Times New Roman", Times, serif;   /* body */
+  --font-ask-serif: "Playfair Display";                    /* Ask */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans", "Liberation Sans", sans-serif; /* Better Questions */
+  --slate-bg: #1f2933;          /* deep slate */
+  --slate-bg-soft: #24303b;     /* header gradient */
+  --slate-text: #f5f7fa;        /* primary white */
+  --slate-muted: rgba(245,247,250,0.72);
+  --slate-hair: rgba(245,247,250,0.14);
+
+  --brand-yellow: rgba(255,215,0,0.8);
+
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(1200px 700px at 20% 0%, rgba(0,0,0,0.03), transparent 55%),
+    radial-gradient(900px 600px at 80% 20%, rgba(0,0,0,0.025), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-main);
+}
+
+/* ===============================
+   Shell / frame
+   =============================== */
+
+.shell {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 22px 16px;
+}
+
+.frame {
+  width: min(980px, 100%);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 140px),
+    var(--slate-bg);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.05),
+    0 18px 60px rgba(0,0,0,0.45);
+  overflow: hidden;
+    color: var(--slate-text);
+
+}
+
+/* ===============================
+   Top header
+   =============================== */
+
+.top {
+  padding: 18px 22px 16px 22px;
+  border-bottom: 1px solid var(--slate-hair);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 70%),
+    radial-gradient(900px 280px at 30% 0%, rgba(255,255,255,0.06), transparent 60%),
+    var(--slate-bg-soft);
+}
+
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* Editorial inset for main content */
+.topLeft {
+  padding-left: 42px;          /* 👈 key move */
+}
+
+/* ===============================
+   Vox-ish kicker + brand
+   =============================== */
+
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px 0;
+}
+
+/* Brand headline */
+.brand-headline {
+  margin: 0 0 10px 0;
+  line-height: 1;
+}
+
+.brand-ask {
+  transform: translateY(2px);
+
+  font-family: "Playfair Display", Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+
+  /* THIS is what brings back the round, lively serifs */
+  font-variation-settings: "opsz" 72;
+
+  font-size: clamp(3.6rem, 7vw, 5rem);
+  letter-spacing: -0.015em;
+  display: inline-block;
+
+  
+  color: var(--brand-yellow);
+}
+
+/* Editorial inset for main content */
+.topLeft {
+  padding-left: 42px;          /* 👈 key move */
+}
+
+/* Small Ask-style emphasis (inline) */
+.ask-em {
+  font-family: var(--font-ask-serif), Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-variation-settings: "opsz" 48;
+
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+
+  
+  color: var(--brand-yellow);
+}
+
+
+.brand-rest {
+  font-family: var(--font-sans);
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0.92;
+  margin-left: 10px;
+    color: var(--slate-text);
+
+}
+
+/* Sub text (2–3 line panels) */
+.sub {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.38;
+  color: var(--slate-muted);
+  max-width: 62ch;
+}
+
+.sub em {
+  font-family: var(--font-ask-serif), Georgia, serif;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--slate-text);
+}
+
+/* ===============================
+   Status mini indicators
+   =============================== */
+
+.status-mini {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(31,35,40,0.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.88);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+}
+
+.mini-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mini-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.18);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.06) inset;
+}
+
+.mini-dot.ok { background: rgba(0,0,0,0.55); }
+
+/* ===============================
+   Ticker (horizontal slide)
+   =============================== */
+
+.ticker { margin-top: 8px; }
+
+.ticker-viewport {
+  height: calc(3 * 1.38em + 36px); /* extra headroom */
+  
+  position: relative;
+
+  padding: 16px 0 12px 0;         /* 👈 key change */
+  margin-top: 10px;
+}
+
+.ticker-track {
+  display: flex;
+  width: 200%;
+  transform: translateX(0%);
+  transition: transform 520ms cubic-bezier(.22,.9,.25,1);
+  will-change: transform;
+}
+
+.ticker-panel {
+  width: 50%;
+  padding: 6px 0;
+  min-height: calc(3 * 1.38em + 18px);
+  display: grid;
+  align-content: start;
+  gap: 8px;
+
+  opacity: 1;
+  filter: blur(0px);
+}
+
+.ticker-track.moving .ticker-panel {
+  opacity: 0.86;
+  filter: blur(0.35px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { transition: none; }
+}
+
+/* ===============================
+   Bottom row (subtle, product-y)
+   =============================== */
+
+.bottom {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+
+  padding: 12px 22px 16px 22px;
+  background: rgba(0,0,0,0.008);
+}
+
+.fine {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.fine.muted { color: var(--muted); }
+
+.ghost {
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(31,35,40,0.12);
+  background: rgba(255,255,255,0.9);
+}
+
+.ghost:hover { background: #fff; }
+
+/* ===============================
+   Responsive
+   =============================== */
+
+@media (max-width: 720px) {
+  .sub { font-size: 15px; }
+  .brand-ask { font-size: clamp(2.8rem, 9vw, 3.6rem); }
+  .brand-rest { font-size: clamp(1.2rem, 4vw, 1.6rem); }
+  .ticker-viewport { height: calc(3 * 1.38em + 18px); }
+}
+
+
+@media (max-width: 720px) {
+  /* Make the whole screen slate */
+  html, body {
+    background: var(--slate-bg);
+    color: var(--slate-text);
+  }
+
+  /* Remove the “card floating on a page” look */
+  .shell {
+    padding: 0;
+    place-items: stretch;
+  }
+
+  .frame {
+    width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: var(--slate-bg);
+  }
+
+  .top {
+    padding: 18px 16px 14px 16px;
+    background: var(--slate-bg-soft);
+  }
+
+  /* Let text breathe + wrap */
+  .topRow {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .topLeft {
+    padding-left: 0;      /* remove desktop inset */
+    border-left: none;
+  }
+
+  /* Headline wraps naturally */
+  .brand-headline {
+    line-height: 1.08;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  /* Allow “Ask” and rest to wrap instead of behaving like a single chunk */
+  .brand-ask {
+    display: inline;      /* was inline-block */
+    transform: none;      /* avoids clipping/weird baseline */
+  }
+
+  .brand-rest {
+    margin-left: 8px;
+  }
+
+  /* Ticker: let it size to content a bit more naturally on small screens */
+  .ticker-viewport {
+    height: auto;         /* key: stop hard-cropping on mobile */
+    overflow: visible;    /* let wraps happen without clipping */
+    padding: 14px 0 10px 0;
+  }
+
+  /* Because viewport is auto, give panels their own spacing */
+  .ticker-panel {
+    min-height: 0;
+  }
+
+  /* Status pills become left-aligned under header */
+  .status-mini {
+    justify-content: flex-start;
+  }
+
+  /* Bottom row adopts slate styling */
+  .bottom {
+    padding: 12px 16px 16px 16px;
+    background: rgba(255,255,255,0.04);
+    border-top: 1px solid var(--slate-hair);
+  }
+
+  .fine { color: var(--slate-text); }
+  .fine.muted { color: var(--slate-muted); }
+
+  .ghost {
+    color: var(--slate-text);
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
+  }
+
+    .ticker-track {
+    display: block;        /* no side-by-side */
+    width: 100%;
+    transform: none !important;
+    transition: none !important;
+  }
+  #panelB { display: none; } /* only show current */
+}
