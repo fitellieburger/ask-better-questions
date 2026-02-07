@@ -58,7 +58,7 @@ html, body {
     0 18px 60px rgba(0,0,0,0.45);
   overflow: hidden;
     color: var(--slate-text);
-
+  padding: 16px;
 }
 
 /* ===============================
@@ -66,7 +66,7 @@ html, body {
    =============================== */
 
 .top {
-  padding: 18px 22px 16px 22px;
+  padding: 0;
   border-bottom: 1px solid var(--slate-hair);
   background:
     linear-gradient(180deg, rgba(255,255,255,0.06), transparent 70%),
@@ -394,3 +394,169 @@ html, body {
   }
   #panelB { display: none; } /* only show current */
 }
+
+/* ---------- Warmup loading bar (inline) ---------- */
+
+.loadingRow{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.loadingLabel{
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.loadingBar{
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--vox-border, rgba(0,0,0,0.16));
+  background: rgba(0,0,0,0.03);
+  overflow: hidden;
+  position: relative;
+  min-width: 120px;
+}
+
+@media (max-width: 520px){
+  .loadingBar{ min-width: 90px; }
+}
+
+@media (prefers-color-scheme: dark){
+  .loadingBar{
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.16);
+  }
+}
+
+.loadingFill{
+  height: 100%;
+  border-radius: 999px;
+  transition: width 260ms ease;
+  background: linear-gradient(
+    to right,
+    rgba(255,215,0,0.18),
+    rgba(255,215,0,0.82)
+  );
+  position: relative;
+}
+
+/* shimmer so the loop feels alive (especially at 95%) */
+.loadingFill::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.25),
+    rgba(255,255,255,0)
+  );
+  transform: translateX(-70%);
+  animation: warmupShimmer 1.15s linear infinite;
+  opacity: 0.75;
+}
+
+@keyframes warmupShimmer{
+  0%   { transform: translateX(-70%); }
+  100% { transform: translateX(70%); }
+}
+
+/* ---------- Warmup loading bar (bottom-right under card) ---------- */
+
+.warmupLoadWrap{
+  /* sits just below and to the right of the card */
+  display: flex;
+  justify-content: flex-end;
+  margin:6px auto 0 auto; /* center under card, with a bit of breathing room */
+  width: 100%;
+  max-width: 920px;           /* MUST match .frame */
+  padding: 16px 22px;          /* MUST match .frame padding */
+
+  font-family: var(--vox-sans, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
+}
+
+.warmupLoadRow{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(33vw, 360px);   /* ~1/3 screen, capped */
+}
+
+/* Mobile: full-width loading bar across bottom */
+@media (max-width: 520px){
+  .warmupLoadWrap{
+    max-width: none;       /* break out of card width */
+    padding: 0 14px 12px;  /* small side padding + bottom breathing room */
+  }
+
+  .warmupLoadRow{
+    width: 100%;           /* full width */
+  }
+}
+
+.warmupLoadLabel{
+  font-weight: 800;
+  font-size: 0.82rem;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.warmupLoadBar{
+  position: relative;
+  flex: 1;
+  height: 8px;               /* small bar */
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--vox-border, rgba(0,0,0,0.16));
+  background: rgba(0,0,0,0.03);
+}
+
+@media (prefers-color-scheme: dark){
+  .warmupLoadBar{
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.16);
+  }
+}
+
+.warmupLoadFill{
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  transition: width 260ms ease;
+  background: linear-gradient(
+    to right,
+    rgba(255,215,0,0.18),
+    rgba(255,215,0,0.88)
+  );
+}
+
+/* Always-on shimmer so it feels alive even when fill freezes at 95% */
+.warmupLoadShimmer{
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.22),
+    rgba(255,255,255,0)
+  );
+  transform: translateX(-70%);
+  opacity: 0.65;
+  animation: warmupShimmer 1.1s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes warmupShimmer{
+  0%   { transform: translateX(-70%); }
+  100% { transform: translateX(70%); }
+}
+

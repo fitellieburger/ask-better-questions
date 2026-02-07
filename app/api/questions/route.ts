@@ -212,7 +212,7 @@ function computeMeter(meta: Meta): Meter {
 // -----------------------------
 async function extractFromUrl(url: string): Promise<ExtractResponse> {
   const extractorUrl =
-    process.env.EXTRACTOR_URL ?? "http://127.0.0.1:8001/extract";
+    process.env.EXTRACTOR_URL ?? "https://ask-better-questions-vrjh.onrender.com/extract";
 
   const r = await fetch(extractorUrl, {
     method: "POST",

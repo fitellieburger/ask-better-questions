@@ -17,6 +17,19 @@ const track = document.getElementById("tickerTrack");
 const panelA = document.getElementById("panelA");
 const panelB = document.getElementById("panelB");
 
+const loadingFill = document.getElementById("loadingFill");
+
+let warmupTicks = 0;
+const WARMUP_STEP = 5;
+const WARMUP_CAP = 95;
+const WARMUP_MAX_TICKS = 19;
+
+function setLoading(pct) {
+  if (!loadingFill) return;
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  loadingFill.style.width = `${v}%`;
+}
+
 function setDot(el, ok) {
   el.classList.toggle("ok", !!ok);
 }
@@ -113,9 +126,8 @@ const tips = [
     <h1 class="brand-headline">
         <span class="brand-rest">Spot the </span>
         <span class="brand-ask">shift </span>
-        
-        <span class="brand-rest">and stay true to your frame.</span>
-        
+        <span class="brand-rest">so you can </span>
+        <span class="brand-ask">focus </span>
         </h1>
     `
   },
@@ -194,6 +206,10 @@ setInterval(advanceTicker, 5200);
 
 async function warmupLoop() {
 
+    // progress: 5% per iteration, cap at 95% (19 ticks)
+  warmupTicks = Math.min(WARMUP_MAX_TICKS, warmupTicks + 1);
+  setLoading(Math.min(WARMUP_CAP, warmupTicks * WARMUP_STEP));
+
     
   const [appOk, extOk] = await Promise.all([
     ping(APP_HEALTH),
@@ -201,13 +217,11 @@ async function warmupLoop() {
   ]);
 
   
-  console.log("warmupLoop", { APP_HEALTH, EXTRACTOR_HEALTH, appOk, extOk, ready, redirected, REDIRECT_TO });
-
-
 if (appOk && extOk && !ready) {
   ready = true;
 
-  // Stop the ticker so nothing keeps running
+  // Set loading to 100% before redirecting, so it doesn't feel like a stall.
+    setLoading(100);
 
   // Stop polling (by preventing new scheduling)
   redirected = true;
