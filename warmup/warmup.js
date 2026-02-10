@@ -78,7 +78,7 @@ const tips = [
   {
     html: `
       <h1 class="brand-headline">
-    <span class="brand-ask">Understand </span>
+    <span class="brand-ask">Question </span>
     <span class="brand-rest">the author</span>
   </h1>
     `
@@ -126,7 +126,7 @@ const tips = [
     <h1 class="brand-headline">
         <span class="brand-rest">Spot the </span>
         <span class="brand-ask">shift </span>
-        <span class="brand-rest">so you can </span>
+        <span class="brand-rest">find your </span>
         <span class="brand-ask">focus </span>
         </h1>
     `
@@ -135,13 +135,123 @@ const tips = [
     html: `
     <h1 class="brand-headline">
         <span class="brand-rest">Take a deep </span>
-        <span class="brand-ask">Breath</span>
+        <span class="brand-ask">breath</span>
         
         <span class="brand-rest">...how do you feel?</span>
         
         </h1>
     `
-  }
+  },
+  {
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-ask">Pause</span>
+      <span class="brand-rest"> before you react.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Ask what’s being </span>
+      <span class="brand-ask">asked of you.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Who benefits from </span>
+      <span class="brand-ask">believing</span>
+      <span class="brand-rest"> this?</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">What’s the </span>
+      <span class="brand-ask">claim?</span>
+      <span class="brand-rest"> What’s the proof?</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Strong feeling?</span>
+      <span class="brand-ask"> Slow down.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Notice the </span>
+      <span class="brand-ask">emotion</span>
+      <span class="brand-rest">—then read.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Urgency is a </span>
+      <span class="brand-ask">signal.</span>
+      <span class="brand-rest">not a command.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">If it wants you angry,</span>
+      <span class="brand-ask">ask why.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Being confident </span>
+      <span class="brand-ask">confident</span>
+      <span class="brand-rest">isn't being </span>
+      <span class="brand-ask">right.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+    <span class="brand-ask">Loud</span>
+      <span class="brand-rest"> doesn’t mean true.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Coincidence isn’t </span>
+      <span class="brand-ask">evidence.</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Are you learning—</span>
+      <span class="brand-ask">or just nodding?</span>
+    </h1>
+  `
+},
+{
+  html: `
+    <h1 class="brand-headline">
+      <span class="brand-rest">Does this make sense—</span>
+      <span class="brand-ask">or just feel good?</span>
+    </h1>
+  `
+}
 ];
 
 // ---- Sequence control ----
@@ -175,28 +285,45 @@ function nextSlideHTML() {
   return tips[idx].html;
 }
 
+function settle(el){
+  if (!el) return;
+
+  // If GSAP isn't loaded for any reason, fall back silently.
+  if (typeof gsap === "undefined") return;
+
+  gsap.killTweensOf(el);
+  gsap.fromTo(
+    el,
+    { y: 10, opacity: 0, filter: "blur(6px)" },
+    { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.7, ease: "power3.out" }
+  );
+}
+
+
 function advanceTicker() {
-  panelB.innerHTML = nextSlideHTML();
+    if (typeof gsap === "undefined") {
+    panelA.innerHTML = nextSlideHTML();
+    return;
+  }
 
-  track.classList.add("moving");
-  track.style.transform = "translateX(-50%)";
+  gsap.to(panelA, {
+    opacity: 0,
+    filter: "blur(4px)",
+    duration: 0.18,
+    ease: "power1.out",
+    onComplete: () => {
+      panelA.innerHTML = nextSlideHTML();
+      settle(panelA);
+    }
+  });
 
-  setTimeout(() => {
-    panelA.innerHTML = panelB.innerHTML;
-    panelB.innerHTML = "";
-
-    track.style.transition = "none";
-    track.style.transform = "translateX(0%)";
-    void track.offsetWidth;
-    track.style.transition = "transform 520ms cubic-bezier(.22,.9,.25,1)";
-    track.classList.remove("moving");
-  }, 560);
 }
 
 
 
 // Init: top panel is brand, next will be purpose.
 setPanelHTML(panelA, brandSlide);
+settle(panelA);
 panelB.innerHTML = "";
 
 
@@ -216,6 +343,7 @@ async function warmupLoop() {
     ping(EXTRACTOR_HEALTH),
   ]);
 
+  //appOk = false; // DEV: force extractor failure to test loading state
   
 if (appOk && extOk && !ready) {
   ready = true;
