@@ -1,4 +1,11 @@
 const cfg = window.WARMUP_CONFIG || {};
+const NO_REDIRECT =
+  cfg.NO_REDIRECT === true ||
+  new URLSearchParams(window.location.search).has("noredirect") ||
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
+
 const APP_BASE = (cfg.APP_BASE || "https://ask-better-questions.onrender.com/").replace(/\/$/, "");
 const EXTRACTOR_BASE = (cfg.EXTRACTOR_BASE || "https://ask-better-questions-vrjh.onrender.com").replace(/\/$/, "");
 
@@ -214,7 +221,6 @@ const tips = [
   html: `
     <h1 class="brand-headline">
       <span class="brand-rest">Being confident </span>
-      <span class="brand-ask">confident</span>
       <span class="brand-rest">isn't being </span>
       <span class="brand-ask">right.</span>
     </h1>
@@ -354,12 +360,13 @@ if (appOk && extOk && !ready) {
   // Stop polling (by preventing new scheduling)
   redirected = true;
 
-  // Navigate in a way that can't be "back button trapped"
-  setTimeout(() => {
-    console.log("Redirecting to:", REDIRECT_TO);
-    window.location.replace(REDIRECT_TO);
-  }, 150); // keep short; no need to wait 450ms
-  return;
+  
+  if (!NO_REDIRECT) {
+    redirected = true;
+    setTimeout(() => window.location.replace(REDIRECT_TO), 150);
+  } else {
+    console.log("NO_REDIRECT enabled; would redirect to:", REDIRECT_TO);
+  }
 }
 
 if (!redirected) setTimeout(warmupLoop, 700);

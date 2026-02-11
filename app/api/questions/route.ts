@@ -1,6 +1,6 @@
 // app/api/questions/route.ts
 import OpenAI from "openai";
-import { buildPrompt, type Mode } from "@/lib/prompt";
+import { buildPrompt, type Mode as PromptMode } from "@/lib/prompt";
 
 export const runtime = "nodejs";
 
@@ -10,6 +10,8 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // -----------------------------
 // Types
 // -----------------------------
+type Mode = PromptMode | "bundle";
+
 type Label = "Words" | "Proof" | "Missing";
 type Meta = { neutrality: number; heat: number; support: number };
 
@@ -34,10 +36,25 @@ type Meter = {
 };
 
 type NormalizedOutput = {
-  mode: Mode;
+  mode: Exclude<Mode, "bundle">;
   items: NormalizedItem[];
   meta?: Meta;
-  meter?: Meter; // optional so existing UI doesn't break
+  meter?: Meter;
+};
+
+type BundleSet = { items: NormalizedItem[] };
+
+type BundledOutput = {
+  mode: "bundle";
+  // Back-compat: keep "items" so old UI doesn’t break (defaults to fast set).
+  items: NormalizedItem[];
+  sets: {
+    fast: BundleSet;
+    deeper: BundleSet;
+    cliff: BundleSet;
+  };
+  meta?: Meta;
+  meter?: Meter;
 };
 
 type ExtractCandidate = {
@@ -63,7 +80,7 @@ type NeedsChoice = {
   candidates: ExtractCandidate[];
 };
 
-type ApiOut = NormalizedOutput | NeedsChoice;
+type ApiOut = NormalizedOutput | BundledOutput | NeedsChoice;
 
 type Body = {
   mode?: unknown;
@@ -77,17 +94,15 @@ type Body = {
 // Small helpers
 // -----------------------------
 
-// Mode parsing with safe default
 function parseMode(raw: unknown): Mode {
+  if (raw === "bundle") return "bundle";
   return raw === "deeper" || raw === "fast" || raw === "cliff" ? raw : "fast";
 }
 
-// Label guard used by normalization
 function isLabel(x: unknown): x is Label {
   return x === "Words" || x === "Proof" || x === "Missing";
 }
 
-// Meta guard used by normalization
 function isMeta(value: unknown): value is Meta {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -98,12 +113,10 @@ function isMeta(value: unknown): value is Meta {
   );
 }
 
-// Clamp meta values to 0..100 and round
 function clamp0to100(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-// JSON response helper
 function json(status: number, data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -119,7 +132,6 @@ function unprocessable(message: string): Response {
   return json(422, { error: message });
 }
 
-// Needs-choice response for multi-story pages
 function needsChoice(mode: Mode, extracted: ExtractResponse): Response {
   const out: NeedsChoice = {
     mode,
@@ -130,7 +142,6 @@ function needsChoice(mode: Mode, extracted: ExtractResponse): Response {
   return json(200, out);
 }
 
-// Enforce minimum text length (paste + extracted)
 function requireMinText(text: string, min = 80): string {
   const t = text.trim();
   if (t.length < min) throw new Error(`MIN_TEXT:${min}`);
@@ -138,20 +149,13 @@ function requireMinText(text: string, min = 80): string {
 }
 
 // -----------------------------
-// Meter logic (UPDATED: Support fill + Heat glow)
+// Meter logic (Support fill + Heat glow)
 // -----------------------------
 
-/**
- * Clamp for display meter only.
- * Prevents "no fill at all" and avoids "always maxed out".
- */
 function clampForMeter(n: number, lo = 10, hi = 95): number {
   return Math.max(lo, Math.min(hi, Math.round(n)));
 }
 
-/**
- * Turn a meter value into a user-facing label.
- */
 function meterLabel(v: number): Meter["label"] {
   if (v >= 80) return "Supported";
   if (v >= 55) return "Mixed support";
@@ -161,64 +165,48 @@ function meterLabel(v: number): Meter["label"] {
 /**
  * Support -> fill curve (support-only)
  *
- * Design goals:
+ * Goals:
  * - Preserve intuitive mapping: 55 support should look ~55% (not 25%).
- * - Add *gentle* separation in the 60–85 range (where humans perceive nuance).
- * - Keep monotonic and bounded.
- *
- * Implementation:
- * - Work in [0,1]
- * - Apply a small anchored boost term: k*(s-anchor)*s*(1-s)
- *   This keeps s=anchor fixed (no change), boosts above anchor, slightly lowers below.
+ * - Gentle separation in 60–85 range (human nuance).
+ * - Monotonic & bounded.
  */
 function curveSupportToFill(support: number): number {
   const s = clamp0to100(support) / 100; // 0..1
-  const anchor = 0.55;                 // keep 55% “honest”
-  const k = 1.0;                       // gentle; tune 0.8..1.4
+  const anchor = 0.55;
+  const k = 1.0;
 
   const y = s + k * (s - anchor) * s * (1 - s);
-
-  // Guard rails
   const yClamped = Math.max(0, Math.min(1, y));
-  return yClamped * 100; // 0..100
+  return yClamped * 100;
 }
 
-/**
- * Compute UI meter:
- * - Fill is SUPPORT ONLY (curved + clamped)
- * - Glow is HEAT ONLY (export raw heat 0–100; UI decides rendering)
- * - Wave triggers for very high heat (>80)
- */
 function computeMeter(meta: Meta): Meter {
   const support = clamp0to100(meta.support);
   const heat = clamp0to100(meta.heat);
 
   const curvedFill = curveSupportToFill(support);
-
-  // Only clamp at the very end for the thermometer look
   const value = clampForMeter(curvedFill, 10, 95);
 
   return {
     value,
     label: meterLabel(value),
-    glow: heat,       // 🔥 raw heat, do not curve server-side
+    glow: heat, // raw heat
     wave: heat > 80
   };
 }
-
 
 // -----------------------------
 // URL extraction (calls your Python microservice)
 // -----------------------------
 async function extractFromUrl(url: string): Promise<ExtractResponse> {
   const extractorUrl =
-    process.env.EXTRACTOR_URL ?? "https://ask-better-questions-vrjh.onrender.com/extract";
+    process.env.EXTRACTOR_URL ??
+    "https://ask-better-questions-vrjh.onrender.com/extract";
 
   const r = await fetch(extractorUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      // Shared secret: your extractor should verify this
       "x-extractor-key": process.env.EXTRACTOR_KEY ?? ""
     },
     body: JSON.stringify({ url, include_candidates: true })
@@ -239,7 +227,6 @@ async function runModel(prompt: string): Promise<unknown> {
   const resp = await client.responses.create({
     model: "gpt-5.2",
     input: prompt,
-    // Ask for strict JSON object output
     text: { format: { type: "json_object" } }
   });
 
@@ -268,7 +255,6 @@ async function resolveInput(
 > {
   const inputMode = body.inputMode === "url" ? "url" : "paste";
 
-  // Paste mode: use provided text
   if (inputMode === "paste") {
     const text = String(body.text ?? "");
     try {
@@ -276,14 +262,11 @@ async function resolveInput(
     } catch {
       return {
         kind: "choice",
-        response: badRequest(
-          "Paste a bit more article text (at least ~80 characters)."
-        )
+        response: badRequest("Paste a bit more article text (at least ~80 characters).")
       };
     }
   }
 
-  // URL mode: extract from URL (or from chosen candidate URL)
   const url = String(body.url ?? "").trim();
   const chosenUrl = String(body.chosenUrl ?? "").trim();
 
@@ -291,23 +274,18 @@ async function resolveInput(
     return { kind: "choice", response: badRequest("Paste a valid URL.") };
   }
 
-  // Extract the chosen URL if present; otherwise extract the original URL
   const targetUrl = chosenUrl || url;
   const extracted = await extractFromUrl(targetUrl);
 
-  // Only show candidates when the user has NOT picked yet
   if (!chosenUrl && extracted.is_multi) {
     return { kind: "choice", response: needsChoice(mode, extracted) };
   }
 
-  // Otherwise proceed with extracted text
   const text = (extracted.text ?? "").trim();
   if (text.length < 80) {
     return {
       kind: "choice",
-      response: unprocessable(
-        "Could not extract enough article text from that URL."
-      )
+      response: unprocessable("Could not extract enough article text from that URL.")
     };
   }
 
@@ -315,16 +293,14 @@ async function resolveInput(
 }
 
 // -----------------------------
-// Normalization
+// Normalization (single-set)
 // -----------------------------
-function normalizeModelOutput(parsed: unknown, mode: Mode): NormalizedOutput {
+function normalizeItemsOnly(parsed: unknown, mode: Exclude<Mode, "bundle">): { items: NormalizedItem[]; meta?: Meta } {
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error("Model returned non-object JSON.");
   }
 
   const obj = parsed as Record<string, unknown>;
-
-  // Accept either "items" or legacy "questions"
   const rawItems = (obj.items ?? obj.questions) as unknown;
 
   if (!Array.isArray(rawItems) || rawItems.length !== 3) {
@@ -338,29 +314,23 @@ function normalizeModelOutput(parsed: unknown, mode: Mode): NormalizedOutput {
 
     const it = raw as Record<string, unknown>;
 
-    // label
-    if (!isLabel(it.label)) {
-      throw new Error("Invalid label.");
-    }
+    if (!isLabel(it.label)) throw new Error("Invalid label.");
 
-    // why
     const why = typeof it.why === "string" ? it.why.trim() : "";
     if (!why) throw new Error("Missing why.");
 
-    // text from one of: text | question | cue
     const textCandidate =
       typeof it.text === "string"
         ? it.text
         : typeof it.question === "string"
-        ? it.question
-        : typeof it.cue === "string"
-        ? it.cue
-        : "";
+          ? it.question
+          : typeof it.cue === "string"
+            ? it.cue
+            : "";
 
     const text = textCandidate.trim();
     if (!text) throw new Error("Missing text.");
 
-    // Enforce punctuation by mode at API boundary
     if (mode === "cliff") {
       if (text.includes("?")) throw new Error("Cliff cue contains '?'.");
       if (!text.endsWith(".")) throw new Error("Cliff cue must end with '.'.");
@@ -371,7 +341,6 @@ function normalizeModelOutput(parsed: unknown, mode: Mode): NormalizedOutput {
     return { label: it.label, text, why };
   });
 
-  // Optional meta from model
   const meta = isMeta(obj.meta)
     ? {
         neutrality: clamp0to100(obj.meta.neutrality),
@@ -380,12 +349,12 @@ function normalizeModelOutput(parsed: unknown, mode: Mode): NormalizedOutput {
       }
     : undefined;
 
-  console.log({ meta }); // For debugging: see raw meta in server logs
+  return { items, meta };
+}
 
-  // Compute meter server-side, using meta if present.
-  // Meter fill now reflects SUPPORT only (curved), while HEAT is exported as glow/wave decoration.
+function normalizeModelOutput(parsed: unknown, mode: Exclude<Mode, "bundle">): NormalizedOutput {
+  const { items, meta } = normalizeItemsOnly(parsed, mode);
   const meter = meta ? computeMeter(meta) : undefined;
-
   return { mode, items, meta, meter };
 }
 
@@ -394,19 +363,62 @@ function normalizeModelOutput(parsed: unknown, mode: Mode): NormalizedOutput {
 // -----------------------------
 export async function POST(req: Request) {
   try {
-    // Parse JSON body
     const body = (await req.json()) as Body;
     const mode = parseMode(body.mode);
 
-    // Decide whether we have paste text, extracted text, or need candidate choice
     const resolved = await resolveInput(mode, body);
     if (resolved.kind === "choice") return resolved.response;
 
-    // Build prompt + run model
+    // ✅ Bundle mode: 3 runs, 1 response (back-compat + future-friendly `sets`)
+    if (mode === "bundle") {
+      const [fastParsed, deeperParsed, cliffParsed] = await Promise.all([
+        runModel(buildPrompt(resolved.text, "fast")),
+        runModel(buildPrompt(resolved.text, "deeper")),
+        runModel(buildPrompt(resolved.text, "cliff"))
+      ]);
+
+      const fast = normalizeItemsOnly(fastParsed, "fast");
+      const deeper = normalizeItemsOnly(deeperParsed, "deeper");
+      const cliff = normalizeItemsOnly(cliffParsed, "cliff");
+
+      // Use fast meta as canonical (your prompt rules should make them align anyway).
+      const meta = fast.meta;
+      const meter = meta ? computeMeter(meta) : undefined;
+
+      // Optional sanity logging if meta diverges across modes.
+      if (fast.meta && deeper.meta) {
+        const d =
+          Math.abs(fast.meta.support - deeper.meta.support) +
+          Math.abs(fast.meta.heat - deeper.meta.heat) +
+          Math.abs(fast.meta.neutrality - deeper.meta.neutrality);
+        if (d >= 15) console.warn("Bundle meta differs (fast vs deeper):", { fast: fast.meta, deeper: deeper.meta });
+      }
+      if (fast.meta && cliff.meta) {
+        const d =
+          Math.abs(fast.meta.support - cliff.meta.support) +
+          Math.abs(fast.meta.heat - cliff.meta.heat) +
+          Math.abs(fast.meta.neutrality - cliff.meta.neutrality);
+        if (d >= 15) console.warn("Bundle meta differs (fast vs cliff):", { fast: fast.meta, cliff: cliff.meta });
+      }
+
+      const out: ApiOut = {
+        mode: "bundle",
+        items: fast.items, // back-compat default
+        sets: {
+          fast: { items: fast.items },
+          deeper: { items: deeper.items },
+          cliff: { items: cliff.items }
+        },
+        meta,
+        meter
+      };
+
+      return json(200, out);
+    }
+
+    // ✅ Single-mode (existing behavior)
     const prompt = buildPrompt(resolved.text, mode);
     const parsed = await runModel(prompt);
-
-    // Normalize output (includes meta + meter)
     const normalized = normalizeModelOutput(parsed, mode);
 
     const out: ApiOut = normalized;
