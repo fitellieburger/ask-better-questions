@@ -10,7 +10,7 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // -----------------------------
 // Types
 // -----------------------------
-type Mode = PromptMode | "bundle";
+type Mode = PromptMode; // prompt.ts should now include "bundle"
 
 type Label = "Words" | "Proof" | "Missing";
 type Meta = { neutrality: number; heat: number; support: number };
@@ -25,8 +25,6 @@ type NormalizedItem = { label: Label; text: string; why: string };
  * - label: friendly bucket based on value
  * - glow: 0–100 intensity derived from HEAT (UI decoration)
  * - wave: boolean for "wavy heat" effect at very high heat
- *
- * Backward compatible: existing UI can keep using value + label.
  */
 type Meter = {
   value: number; // 0–100 fill (support-only, curved)
@@ -36,23 +34,21 @@ type Meter = {
 };
 
 type NormalizedOutput = {
-  mode: Exclude<Mode, "bundle">;
+  mode: Exclude<Mode, "bundle">; // fast|deeper|cliff
   items: NormalizedItem[];
   meta?: Meta;
   meter?: Meter;
 };
 
-type BundleSet = { items: NormalizedItem[] };
+type Bundle = {
+  fast: NormalizedItem[];
+  deeper: NormalizedItem[];
+  cliff: NormalizedItem[];
+};
 
 type BundledOutput = {
   mode: "bundle";
-  // Back-compat: keep "items" so old UI doesn’t break (defaults to fast set).
-  items: NormalizedItem[];
-  sets: {
-    fast: BundleSet;
-    deeper: BundleSet;
-    cliff: BundleSet;
-  };
+  bundle: Bundle;
   meta?: Meta;
   meter?: Meter;
 };
@@ -93,10 +89,10 @@ type Body = {
 // -----------------------------
 // Small helpers
 // -----------------------------
-
 function parseMode(raw: unknown): Mode {
-  if (raw === "bundle") return "bundle";
-  return raw === "deeper" || raw === "fast" || raw === "cliff" ? raw : "fast";
+  return raw === "deeper" || raw === "fast" || raw === "cliff" || raw === "bundle"
+    ? raw
+    : "fast";
 }
 
 function isLabel(x: unknown): x is Label {
@@ -151,7 +147,6 @@ function requireMinText(text: string, min = 80): string {
 // -----------------------------
 // Meter logic (Support fill + Heat glow)
 // -----------------------------
-
 function clampForMeter(n: number, lo = 10, hi = 95): number {
   return Math.max(lo, Math.min(hi, Math.round(n)));
 }
@@ -162,14 +157,6 @@ function meterLabel(v: number): Meter["label"] {
   return "Unsupported";
 }
 
-/**
- * Support -> fill curve (support-only)
- *
- * Goals:
- * - Preserve intuitive mapping: 55 support should look ~55% (not 25%).
- * - Gentle separation in 60–85 range (human nuance).
- * - Monotonic & bounded.
- */
 function curveSupportToFill(support: number): number {
   const s = clamp0to100(support) / 100; // 0..1
   const anchor = 0.55;
@@ -190,13 +177,13 @@ function computeMeter(meta: Meta): Meter {
   return {
     value,
     label: meterLabel(value),
-    glow: heat, // raw heat
+    glow: heat,
     wave: heat > 80
   };
 }
 
 // -----------------------------
-// URL extraction (calls your Python microservice)
+// URL extraction
 // -----------------------------
 async function extractFromUrl(url: string): Promise<ExtractResponse> {
   const extractorUrl =
@@ -221,7 +208,7 @@ async function extractFromUrl(url: string): Promise<ExtractResponse> {
 }
 
 // -----------------------------
-// Model call (Responses API)
+// Model call
 // -----------------------------
 async function runModel(prompt: string): Promise<unknown> {
   const resp = await client.responses.create({
@@ -244,7 +231,7 @@ async function runModel(prompt: string): Promise<unknown> {
 }
 
 // -----------------------------
-// Input resolution (paste vs url)
+// Input resolution
 // -----------------------------
 async function resolveInput(
   mode: Mode,
@@ -293,27 +280,17 @@ async function resolveInput(
 }
 
 // -----------------------------
-// Normalization (single-set)
+// Normalization helpers
 // -----------------------------
-function normalizeItemsOnly(parsed: unknown, mode: Exclude<Mode, "bundle">): { items: NormalizedItem[]; meta?: Meta } {
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error("Model returned non-object JSON.");
-  }
-
-  const obj = parsed as Record<string, unknown>;
-  const rawItems = (obj.items ?? obj.questions) as unknown;
-
+function normalizeItems(rawItems: unknown, mode: Exclude<Mode, "bundle">): NormalizedItem[] {
   if (!Array.isArray(rawItems) || rawItems.length !== 3) {
     throw new Error("Model returned unexpected shape (need 3 items).");
   }
 
-  const items: NormalizedItem[] = rawItems.map((raw) => {
-    if (typeof raw !== "object" || raw === null) {
-      throw new Error("Invalid item.");
-    }
+  return rawItems.map((raw) => {
+    if (typeof raw !== "object" || raw === null) throw new Error("Invalid item.");
 
     const it = raw as Record<string, unknown>;
-
     if (!isLabel(it.label)) throw new Error("Invalid label.");
 
     const why = typeof it.why === "string" ? it.why.trim() : "";
@@ -323,10 +300,10 @@ function normalizeItemsOnly(parsed: unknown, mode: Exclude<Mode, "bundle">): { i
       typeof it.text === "string"
         ? it.text
         : typeof it.question === "string"
-          ? it.question
-          : typeof it.cue === "string"
-            ? it.cue
-            : "";
+        ? it.question
+        : typeof it.cue === "string"
+        ? it.cue
+        : "";
 
     const text = textCandidate.trim();
     if (!text) throw new Error("Missing text.");
@@ -340,6 +317,17 @@ function normalizeItemsOnly(parsed: unknown, mode: Exclude<Mode, "bundle">): { i
 
     return { label: it.label, text, why };
   });
+}
+
+function normalizeSingle(parsed: unknown, mode: Exclude<Mode, "bundle">): NormalizedOutput {
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Model returned non-object JSON.");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  const rawItems = (obj.items ?? obj.questions) as unknown;
+
+  const items = normalizeItems(rawItems, mode);
 
   const meta = isMeta(obj.meta)
     ? {
@@ -349,13 +337,45 @@ function normalizeItemsOnly(parsed: unknown, mode: Exclude<Mode, "bundle">): { i
       }
     : undefined;
 
-  return { items, meta };
+  const meter = meta ? computeMeter(meta) : undefined;
+
+  return { mode, items, meta, meter };
 }
 
-function normalizeModelOutput(parsed: unknown, mode: Exclude<Mode, "bundle">): NormalizedOutput {
-  const { items, meta } = normalizeItemsOnly(parsed, mode);
+function normalizeBundle(parsed: unknown): BundledOutput {
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Model returned non-object JSON.");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  const rawBundle = obj.bundle as unknown;
+
+  if (typeof rawBundle !== "object" || rawBundle === null) {
+    throw new Error("Model returned missing/invalid bundle.");
+  }
+
+  const b = rawBundle as Record<string, unknown>;
+
+  const fast = normalizeItems(b.fast, "fast");
+  const deeper = normalizeItems(b.deeper, "deeper");
+  const cliff = normalizeItems(b.cliff, "cliff");
+
+  const meta = isMeta(obj.meta)
+    ? {
+        neutrality: clamp0to100(obj.meta.neutrality),
+        heat: clamp0to100(obj.meta.heat),
+        support: clamp0to100(obj.meta.support)
+      }
+    : undefined;
+
   const meter = meta ? computeMeter(meta) : undefined;
-  return { mode, items, meta, meter };
+
+  return {
+    mode: "bundle",
+    bundle: { fast, deeper, cliff },
+    meta,
+    meter
+  };
 }
 
 // -----------------------------
@@ -369,59 +389,14 @@ export async function POST(req: Request) {
     const resolved = await resolveInput(mode, body);
     if (resolved.kind === "choice") return resolved.response;
 
-    // ✅ Bundle mode: 3 runs, 1 response (back-compat + future-friendly `sets`)
-    if (mode === "bundle") {
-      const [fastParsed, deeperParsed, cliffParsed] = await Promise.all([
-        runModel(buildPrompt(resolved.text, "fast")),
-        runModel(buildPrompt(resolved.text, "deeper")),
-        runModel(buildPrompt(resolved.text, "cliff"))
-      ]);
-
-      const fast = normalizeItemsOnly(fastParsed, "fast");
-      const deeper = normalizeItemsOnly(deeperParsed, "deeper");
-      const cliff = normalizeItemsOnly(cliffParsed, "cliff");
-
-      // Use fast meta as canonical (your prompt rules should make them align anyway).
-      const meta = fast.meta;
-      const meter = meta ? computeMeter(meta) : undefined;
-
-      // Optional sanity logging if meta diverges across modes.
-      if (fast.meta && deeper.meta) {
-        const d =
-          Math.abs(fast.meta.support - deeper.meta.support) +
-          Math.abs(fast.meta.heat - deeper.meta.heat) +
-          Math.abs(fast.meta.neutrality - deeper.meta.neutrality);
-        if (d >= 15) console.warn("Bundle meta differs (fast vs deeper):", { fast: fast.meta, deeper: deeper.meta });
-      }
-      if (fast.meta && cliff.meta) {
-        const d =
-          Math.abs(fast.meta.support - cliff.meta.support) +
-          Math.abs(fast.meta.heat - cliff.meta.heat) +
-          Math.abs(fast.meta.neutrality - cliff.meta.neutrality);
-        if (d >= 15) console.warn("Bundle meta differs (fast vs cliff):", { fast: fast.meta, cliff: cliff.meta });
-      }
-
-      const out: ApiOut = {
-        mode: "bundle",
-        items: fast.items, // back-compat default
-        sets: {
-          fast: { items: fast.items },
-          deeper: { items: deeper.items },
-          cliff: { items: cliff.items }
-        },
-        meta,
-        meter
-      };
-
-      return json(200, out);
-    }
-
-    // ✅ Single-mode (existing behavior)
     const prompt = buildPrompt(resolved.text, mode);
     const parsed = await runModel(prompt);
-    const normalized = normalizeModelOutput(parsed, mode);
 
-    const out: ApiOut = normalized;
+    const out: ApiOut =
+      mode === "bundle"
+        ? normalizeBundle(parsed)
+        : normalizeSingle(parsed, mode);
+
     return json(200, out);
   } catch (err: unknown) {
     console.error("POST /api/questions failed:", err);

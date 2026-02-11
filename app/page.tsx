@@ -36,16 +36,31 @@ type ExtractCandidate = {
   snippet: string;
 };
 
+type OutputMode = "fast" | "deeper" | "cliff";
+
 type NeedsChoice = {
-  mode: "fast" | "deeper" | "cliff";
+  mode: OutputMode | "bundle";
   needsChoice: true;
   sourceUrl: string;
   candidates: ExtractCandidate[];
 };
 
-type ApiSuccess = {
-  mode: "fast" | "deeper" | "cliff";
+type ApiSuccessSingle = {
+  mode: OutputMode;
   items: Item[];
+  meta?: Meta;
+  meter?: Meter;
+};
+
+type Bundle = {
+  fast: Item[];
+  deeper: Item[];
+  cliff: Item[];
+};
+
+type ApiSuccessBundle = {
+  mode: "bundle";
+  bundle: Bundle;
   meta?: Meta;
   meter?: Meter;
 };
@@ -55,10 +70,14 @@ type ApiError = {
   detail?: string;
 };
 
-type ApiResponse = ApiSuccess | ApiError | NeedsChoice;
+type ApiResponse = ApiSuccessSingle | ApiSuccessBundle | ApiError | NeedsChoice;
 
 function isApiError(x: ApiResponse): x is ApiError {
   return "error" in x;
+}
+
+function isBundle(x: ApiResponse): x is ApiSuccessBundle {
+  return "mode" in x && x.mode === "bundle" && "bundle" in x;
 }
 
 // Heat “menu” labels
@@ -143,6 +162,8 @@ export default function Page() {
 
   // Output mode
   const [mode, setMode] = useState<"fast" | "deeper" | "cliff">("fast");
+  const [bundle, setBundle] = useState<Bundle | null>(null);
+
 
   // --- Results ---
   const [items, setItems] = useState<Item[] | null>(null);
@@ -201,8 +222,7 @@ export default function Page() {
     setItems(null);
     setMeta(null);
     setMeter(null);
-
-
+    setBundle(null);
     setShowInfo(false); // ✅ auto-hide when a query is run
 
     const chosenFromClick = opts?.chosenUrlOverride?.trim() ?? "";
@@ -217,9 +237,10 @@ export default function Page() {
       const chosenToUse = chosenFromClick || chosenUrl.trim();
 
       const payload =
-        inputMode === "paste"
-          ? { inputMode, text, mode }
-          : { inputMode, url: urlToUse, mode, chosenUrl: chosenToUse || undefined };
+      inputMode === "paste"
+        ? { inputMode, text, mode: "bundle" as const }
+        : { inputMode, url: urlToUse, mode: "bundle" as const, chosenUrl: chosenToUse || undefined };
+
 
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 25_000);
@@ -250,14 +271,27 @@ export default function Page() {
         return;
       }
 
-      if (!("items" in data)) {
-        throw new Error("Malformed response");
+      if (isBundle(data)) {
+        setMeta(data.meta ?? null);
+        setMeter(data.meter ?? null);
+        setBundle(data.bundle);
+
+        // Show the currently selected tab immediately
+        setItems(data.bundle[mode]);
+        setStage(null);
+        return;
       }
 
-      setMeta(data.meta ?? null);
-      setMeter(data.meter ?? null);
-      setItems(data.items);
-      setStage(null);
+      // (Optional) keep support for single-mode responses during transition
+      if ("items" in data) {
+        setMeta(data.meta ?? null);
+        setMeter(data.meter ?? null);
+        setItems(data.items);
+        setStage(null);
+        return;
+      }
+
+      
     } catch (e: unknown) {
       if (e instanceof DOMException && e.name === "AbortError") {
         setError("That link is taking too long. Try again, or pick a specific story link.");
@@ -524,46 +558,54 @@ export default function Page() {
 
       {/* Output mode tabs */}
       <div className="mode-tabs" role="tablist" aria-label="Output mode">
-        <HelpTip text="Quick questions to get above the text. Generate again after switching modes.">
+        <HelpTip text="Quick questions to get above the text.">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "fast"}
             className={`tab ${mode === "fast" ? "active" : ""}`}
             onClick={() => {
-              setMode("fast");
-              clearCandidatesUI();
-            }}
+  setMode("fast");
+  clearCandidatesUI();
+
+  if (bundle) setItems(bundle.fast);
+}}
           >
             Ask Better Questions
           </button>
         </HelpTip>
 
-        <HelpTip text="Deeper questions, deeper understanding. Generate again after switching modes.">
+        <HelpTip text="Deeper questions, deeper understanding.">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "deeper"}
             className={`tab ${mode === "deeper" ? "active" : ""}`}
             onClick={() => {
-              setMode("deeper");
-              clearCandidatesUI();
-            }}
+  setMode("deeper");
+  clearCandidatesUI();
+
+  if (bundle) setItems(bundle.deeper);
+}}
+
           >
             Be More Curious
           </button>
         </HelpTip>
 
-        <HelpTip text="Here's what we're looking at. Generate again after switching modes.">
+        <HelpTip text="Here's what we're looking at.">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "cliff"}
             className={`tab ${mode === "cliff" ? "active" : ""}`}
             onClick={() => {
-              setMode("cliff");
-              clearCandidatesUI();
-            }}
+  setMode("cliff");
+  clearCandidatesUI();
+
+  if (bundle) setItems(bundle.cliff);
+}}
+
           >
             Get Better Answers
           </button>
