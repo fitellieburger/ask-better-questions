@@ -124,12 +124,28 @@ def _check_extractor_key(req: Request) -> None:
 
 def _client_ip(req: Request) -> str:
     """
-    Basic IP extraction. In production behind a proxy,
-    you may rely on X-Forwarded-For,
-    but only if you trust your proxy setup.
+    Render (and most proxies) forward the real client IP in headers.
+    We prefer those, then fall back to req.client.host.
     """
+    # Common headers set by proxies / CDNs
+    xff = req.headers.get("x-forwarded-for")
+    if xff:
+        # X-Forwarded-For can be: "client, proxy1, proxy2"
+        ip = xff.split(",")[0].strip()
+        if ip:
+            return ip
+
+    xri = req.headers.get("x-real-ip")
+    if xri:
+        return xri.strip()
+
+    cf = req.headers.get("cf-connecting-ip")
+    if cf:
+        return cf.strip()
+
     if req.client and req.client.host:
         return req.client.host
+
     return "unknown"
 
 
@@ -379,13 +395,15 @@ async def extract(req: ExtractRequest, request: Request) -> ExtractResponse:
 
     _check_extractor_key(request)
     ip = _client_ip(request)
-    _rate_limit(ip)
 
-    if not _is_public_http_url(url):
-        raise HTTPException(status_code=400, detail="URL must be http(s) "
-                                                    "and not local.")
-
+    # If cached, serve without charging rate limit.
+    cached = _cache_get(url)
+    if cached is not None:
+        html = cached
+    else:
+        _rate_limit(ip)
     html = await fetch_html(url)
+
     title, text = extract_main_text(html, url)
 
     # Only guess story links if extraction looks suspicious
