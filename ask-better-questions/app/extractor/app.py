@@ -266,6 +266,7 @@ async def fetch_html(url: str) -> str:
     async with httpx.AsyncClient(headers=headers, timeout=timeout,
                                  follow_redirects=True) as client:
         async with client.stream("GET", url) as r:
+            print("Upstream status:", r.status_code)
             r.raise_for_status()
 
             # Content-Type check (only after we have headers)

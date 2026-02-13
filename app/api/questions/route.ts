@@ -201,6 +201,7 @@ async function extractFromUrl(url: string): Promise<ExtractResponse> {
 
   if (!r.ok) {
     const msg = await r.text();
+     console.error("Extractor error:", r.status, msg.slice(0, 800));
     throw new Error(`Extractor failed: ${msg}`);
   }
 
