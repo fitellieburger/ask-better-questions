@@ -51,3 +51,6 @@ build/
 
 # OS noise
 .DS_Store
+
+# Claude Code
+CLAUDE.md
