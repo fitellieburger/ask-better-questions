@@ -72,9 +72,6 @@ type ApiError = {
 
 type ApiResponse = ApiSuccessSingle | ApiSuccessBundle | ApiError | NeedsChoice;
 
-function isApiError(x: ApiResponse): x is ApiError {
-  return "error" in x;
-}
 
 function isBundle(x: ApiResponse): x is ApiSuccessBundle {
   return "mode" in x && x.mode === "bundle" && "bundle" in x;
@@ -211,8 +208,13 @@ export default function Page() {
     setChosenUrl("");
   }
 
+  const MAX_CHARS = 15_000;
+  const charCount = text.length;
+  const overLimit = inputMode === "paste" && charCount > MAX_CHARS;
+
   const canSubmit =
     !loading &&
+    !overLimit &&
     (inputMode === "paste" ? text.trim().length >= 80 : url.trim().length >= 8);
 
   async function onGenerate(opts?: { chosenUrlOverride?: string; urlOverride?: string }) {
@@ -237,15 +239,12 @@ export default function Page() {
       const chosenToUse = chosenFromClick || chosenUrl.trim();
 
       const payload =
-      inputMode === "paste"
-        ? { inputMode, text, mode: "bundle" as const }
-        : { inputMode, url: urlToUse, mode: "bundle" as const, chosenUrl: chosenToUse || undefined };
-
+        inputMode === "paste"
+          ? { inputMode, text, mode: "bundle" as const }
+          : { inputMode, url: urlToUse, mode: "bundle" as const, chosenUrl: chosenToUse || undefined };
 
       const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 25_000);
-
-      setStage(inputMode === "url" ? "Extracting article text…" : "Analyzing…");
+      const t = setTimeout(() => controller.abort(), 45_000);
 
       const res = await fetch("/api/questions", {
         method: "POST",
@@ -256,42 +255,56 @@ export default function Page() {
 
       clearTimeout(t);
 
-      setStage("Writing output…");
+      if (!res.body) throw new Error("No response body.");
 
-      const data: ApiResponse = await res.json();
+      type StreamEvent =
+        | { type: "progress"; stage: string }
+        | { type: "result"; data: ApiResponse }
+        | { type: "choice"; data: NeedsChoice }
+        | { type: "error"; error: string; detail?: string };
 
-      if (!res.ok) {
-        if (isApiError(data)) throw new Error(data.detail ?? data.error);
-        throw new Error("Request failed");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line) as StreamEvent;
+
+          if (event.type === "progress") {
+            setStage(event.stage);
+          } else if (event.type === "choice") {
+            setCandidates(event.data.candidates ?? []);
+            setStage(null);
+            break outer;
+          } else if (event.type === "result") {
+            const data = event.data;
+            if (isBundle(data)) {
+              setMeta(data.meta ?? null);
+              setMeter(data.meter ?? null);
+              setBundle(data.bundle);
+              // Show the currently selected tab immediately
+              setItems(data.bundle[mode]);
+            } else if ("items" in data) {
+              setMeta(data.meta ?? null);
+              setMeter(data.meter ?? null);
+              setItems(data.items);
+            }
+            setStage(null);
+            break outer;
+          } else if (event.type === "error") {
+            throw new Error(event.detail ?? event.error);
+          }
+        }
       }
-
-      if ("needsChoice" in data && data.needsChoice) {
-        setCandidates(data.candidates ?? []);
-        setStage(null);
-        return;
-      }
-
-      if (isBundle(data)) {
-        setMeta(data.meta ?? null);
-        setMeter(data.meter ?? null);
-        setBundle(data.bundle);
-
-        // Show the currently selected tab immediately
-        setItems(data.bundle[mode]);
-        setStage(null);
-        return;
-      }
-
-      // (Optional) keep support for single-mode responses during transition
-      if ("items" in data) {
-        setMeta(data.meta ?? null);
-        setMeter(data.meter ?? null);
-        setItems(data.items);
-        setStage(null);
-        return;
-      }
-
-      
     } catch (e: unknown) {
       if (e instanceof DOMException && e.name === "AbortError") {
         setError("That link is taking too long. Try again, or pick a specific story link.");
@@ -390,7 +403,7 @@ export default function Page() {
       </p>
 
       <p className="infoP" style={{ marginBottom: 0 }}>
-        <strong>Get Better Answers</strong> is a peek under the hood, showing you what we are picking up on. It’s not a scorecard or a verdict — it’s a glimpse of the text’s signals and vibes, warts and all.
+        <strong>Get Better Answers</strong> is a peek under the hood, showing you what we are picking up on.
       </p>
     </div>
   </details>
@@ -468,7 +481,9 @@ export default function Page() {
               ) : (
                 <span className="status-text">
                   {inputMode === "paste"
-                    ? text.trim().length < 80
+                    ? overLimit
+                      ? `Too long — ${charCount.toLocaleString()} / ${MAX_CHARS.toLocaleString()} chars. Trim the text.`
+                      : text.trim().length < 80
                       ? "Paste a bit more text (≥ ~80 chars)."
                       : "Ready when you are."
                     : url.trim().length < 8

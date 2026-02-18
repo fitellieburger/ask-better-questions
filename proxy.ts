@@ -1,4 +1,4 @@
-// middleware.ts
+// proxy.ts (replaces middleware.ts — renamed per Next.js 16 convention)
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -19,13 +19,13 @@ function isAsset(pathname: string) {
   );
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
 
   // ✅ Never touch assets
   if (isAsset(pathname)) return NextResponse.next();
 
-  // ✅ Add explicit “no redirect” escape hatch for local testing
+  // ✅ Add explicit "no redirect" escape hatch for local testing
   if (
     req.nextUrl.hostname === "localhost" ||
     req.nextUrl.hostname === "127.0.0.1" ||

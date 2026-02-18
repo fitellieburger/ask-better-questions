@@ -4,8 +4,13 @@ import { buildPrompt, type Mode as PromptMode } from "@/lib/prompt";
 
 export const runtime = "nodejs";
 
-// OpenAI client (server-side only)
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// OpenAI client — lazy singleton so missing API key fails at request time,
+// not at module load (which would crash the dev server before any request).
+let _client: OpenAI | null = null;
+function getClient(): OpenAI {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _client;
+}
 
 // -----------------------------
 // Types
@@ -113,36 +118,6 @@ function clamp0to100(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-function json(status: number, data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/json" }
-  });
-}
-
-function badRequest(message: string): Response {
-  return json(400, { error: message });
-}
-
-function unprocessable(message: string): Response {
-  return json(422, { error: message });
-}
-
-function needsChoice(mode: Mode, extracted: ExtractResponse): Response {
-  const out: NeedsChoice = {
-    mode,
-    needsChoice: true,
-    sourceUrl: extracted.url,
-    candidates: extracted.candidates ?? []
-  };
-  return json(200, out);
-}
-
-function requireMinText(text: string, min = 80): string {
-  const t = text.trim();
-  if (t.length < min) throw new Error(`MIN_TEXT:${min}`);
-  return t;
-}
 
 // -----------------------------
 // Meter logic (Support fill + Heat glow)
@@ -212,11 +187,14 @@ async function extractFromUrl(url: string): Promise<ExtractResponse> {
 // Model call
 // -----------------------------
 async function runModel(prompt: string): Promise<unknown> {
-  const resp = await client.responses.create({
-    model: "gpt-5.2",
-    input: prompt,
-    text: { format: { type: "json_object" } }
-  });
+  const resp = await getClient().responses.create(
+    {
+      model: "gpt-5.2",
+      input: prompt,
+      text: { format: { type: "json_object" } }
+    },
+    { signal: AbortSignal.timeout(30_000) }
+  );
 
   const output = resp.output?.[0];
   if (!output || output.type !== "message") {
@@ -234,47 +212,40 @@ async function runModel(prompt: string): Promise<unknown> {
 // -----------------------------
 // Input resolution
 // -----------------------------
-async function resolveInput(
-  mode: Mode,
-  body: Body
-): Promise<
+type ResolveResult =
   | { kind: "text"; text: string }
-  | { kind: "choice"; response: Response }
-> {
+  | { kind: "needs-choice"; sourceUrl: string; candidates: ExtractCandidate[] }
+  | { kind: "error"; message: string };
+
+async function resolveInput(body: Body): Promise<ResolveResult> {
   const inputMode = body.inputMode === "url" ? "url" : "paste";
 
   if (inputMode === "paste") {
     const text = String(body.text ?? "");
-    try {
-      return { kind: "text", text: requireMinText(text, 80) };
-    } catch {
-      return {
-        kind: "choice",
-        response: badRequest("Paste a bit more article text (at least ~80 characters).")
-      };
+    const trimmed = text.trim();
+    if (trimmed.length < 80) {
+      return { kind: "error", message: "Paste a bit more article text (at least ~80 characters)." };
     }
+    return { kind: "text", text: trimmed };
   }
 
   const url = String(body.url ?? "").trim();
   const chosenUrl = String(body.chosenUrl ?? "").trim();
 
   if (url.length < 8) {
-    return { kind: "choice", response: badRequest("Paste a valid URL.") };
+    return { kind: "error", message: "Paste a valid URL." };
   }
 
   const targetUrl = chosenUrl || url;
   const extracted = await extractFromUrl(targetUrl);
 
   if (!chosenUrl && extracted.is_multi) {
-    return { kind: "choice", response: needsChoice(mode, extracted) };
+    return { kind: "needs-choice", sourceUrl: extracted.url, candidates: extracted.candidates ?? [] };
   }
 
   const text = (extracted.text ?? "").trim();
   if (text.length < 80) {
-    return {
-      kind: "choice",
-      response: unprocessable("Could not extract enough article text from that URL.")
-    };
+    return { kind: "error", message: "Could not extract enough article text from that URL." };
   }
 
   return { kind: "text", text };
@@ -380,28 +351,67 @@ function normalizeBundle(parsed: unknown): BundledOutput {
 }
 
 // -----------------------------
-// Route handler
+// Route handler (streaming NDJSON)
 // -----------------------------
 export async function POST(req: Request) {
-  try {
-    const body = (await req.json()) as Body;
-    const mode = parseMode(body.mode);
+  const encoder = new TextEncoder();
 
-    const resolved = await resolveInput(mode, body);
-    if (resolved.kind === "choice") return resolved.response;
+  const stream = new ReadableStream({
+    async start(controller) {
+      function send(event: object) {
+        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      }
 
-    const prompt = buildPrompt(resolved.text, mode);
-    const parsed = await runModel(prompt);
+      try {
+        const body = (await req.json()) as Body;
+        const mode = parseMode(body.mode);
+        const inputMode = body.inputMode === "url" ? "url" : "paste";
 
-    const out: ApiOut =
-      mode === "bundle"
-        ? normalizeBundle(parsed)
-        : normalizeSingle(parsed, mode);
+        send({ type: "progress", stage: inputMode === "url" ? "Fetching page…" : "Reading text…" });
 
-    return json(200, out);
-  } catch (err: unknown) {
-    console.error("POST /api/questions failed:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return json(500, { error: "Failed to generate output.", detail: message });
-  }
+        const resolved = await resolveInput(body);
+
+        if (resolved.kind === "error") {
+          send({ type: "error", error: resolved.message });
+          return;
+        }
+
+        if (resolved.kind === "needs-choice") {
+          const out: NeedsChoice = {
+            mode,
+            needsChoice: true,
+            sourceUrl: resolved.sourceUrl,
+            candidates: resolved.candidates
+          };
+          send({ type: "choice", data: out });
+          return;
+        }
+
+        send({ type: "progress", stage: "Analyzing…" });
+
+        const prompt = buildPrompt(resolved.text, mode);
+        const parsed = await runModel(prompt);
+
+        send({ type: "progress", stage: "Writing output…" });
+
+        const out: ApiOut =
+          mode === "bundle"
+            ? normalizeBundle(parsed)
+            : normalizeSingle(parsed, mode);
+
+        send({ type: "result", data: out });
+      } catch (err: unknown) {
+        console.error("POST /api/questions failed:", err);
+        const message = err instanceof Error ? err.message : "Unknown error";
+        send({ type: "error", error: "Failed to generate output.", detail: message });
+      } finally {
+        controller.close();
+      }
+    }
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: { "Content-Type": "application/x-ndjson" }
+  });
 }

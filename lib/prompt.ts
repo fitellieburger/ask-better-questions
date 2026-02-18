@@ -438,6 +438,7 @@ PROOF ITEM — MOST IMPORTANT FIX (applies in every set):
 MISSING ITEM — ABSENCE-AS-SIGNAL (applies in every set):
 - Ask about a move the author chose not to make (standard, comparison, scope, restraint boundary).
 - Do not assume omission is a flaw; sometimes the standard is not available.
+- Be specific. "What all is not included?" does not help teach the reader. What one piece of information would create doubt, and is it addressed?
 - Explain in "why" what the missing info would add.
 
 SET-SPECIFIC STRICT RULES:
