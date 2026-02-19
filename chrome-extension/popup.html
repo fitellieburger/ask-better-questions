@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ask Better Questions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- ── Warmup overlay (shown while Render is cold-starting) ── -->
+  <div id="warmup">
+    <div class="wu-shell">
+      <div class="wu-ticker">
+        <div id="ticker-panel" class="ticker-panel"></div>
+      </div>
+      <div class="wu-bar-row">
+        <span class="wu-bar-label">Loading</span>
+        <div class="wu-bar-track">
+          <div id="wu-fill" class="wu-fill"></div>
+          <div class="wu-shimmer" aria-hidden="true"></div>
+        </div>
+      </div>
+      <p id="wu-status" class="wu-status">Starting up…</p>
+    </div>
+  </div>
+
+  <!-- ── Main results (revealed when API responds) ── -->
+  <div id="main" class="hidden">
+
+    <header>
+      <span class="logo">Ask Better Questions</span>
+      <span id="status-inline" class="status-inline hidden"></span>
+    </header>
+
+    <div id="error" class="error hidden"></div>
+
+    <!-- Choice panel (hub / multi-story pages) -->
+    <div id="choice-panel" class="hidden">
+      <p class="choice-prompt">This page has multiple articles. Pick one:</p>
+      <ul id="candidate-list"></ul>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="fast"   role="tab">Fast</button>
+        <button class="tab"        data-tab="deeper" role="tab">Deeper</button>
+        <button class="tab"        data-tab="cliff"  role="tab">Cliff</button>
+      </div>
+      <ul id="items"></ul>
+      <div id="meter" class="meter hidden">
+        <div class="meter-bar-wrap">
+          <div class="meter-bar" id="meter-bar"></div>
+        </div>
+        <span class="meter-label" id="meter-label"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

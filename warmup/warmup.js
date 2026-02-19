@@ -29,7 +29,7 @@ const loadingFill = document.getElementById("loadingFill");
 let warmupTicks = 0;
 const WARMUP_STEP = 5;
 const WARMUP_CAP = 95;
-const WARMUP_MAX_TICKS = 19;
+const WARMUP_MAX_TICKS = 30;
 
 function setLoading(pct) {
   if (!loadingFill) return;
