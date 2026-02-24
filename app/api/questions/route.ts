@@ -206,7 +206,10 @@ async function runModel(prompt: string): Promise<unknown> {
     throw new Error("Model did not return text output.");
   }
 
-  return JSON.parse(content.text);
+  const parsed = JSON.parse(content.text);
+  // TEMP: log raw model output to diagnose missing excerpt fields
+  console.log("[ABQ raw]", JSON.stringify(parsed).slice(0, 2000));
+  return parsed;
 }
 
 // -----------------------------
