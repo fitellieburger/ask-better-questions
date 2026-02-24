@@ -703,6 +703,11 @@ header {
     statusEl.textContent = "Fetching page…";
 
     const port = chrome.runtime.connect({ name: "abq-analyze" });
+    let settled = false;
+
+    port.onDisconnect.addListener(() => {
+      if (!settled) showError("Connection lost — please try again.");
+    });
 
     port.onMessage.addListener((event) => {
       if (event.type === "progress") {
@@ -715,10 +720,12 @@ header {
         }
 
       } else if (event.type === "result") {
+        settled = true;
         port.disconnect();
         showResults(event.data);
 
       } else if (event.type === "choice") {
+        settled = true;
         port.disconnect();
         hideWarmup();
         candidatesEl.innerHTML = "";
@@ -739,6 +746,7 @@ header {
         show(choiceEl);
 
       } else if (event.type === "error") {
+        settled = true;
         port.disconnect();
         showError(event.error + (event.detail ? ` — ${event.detail}` : ""));
       }
