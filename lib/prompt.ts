@@ -400,9 +400,21 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "bundle": {
-    "fast":   [ { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }, x3 ],
-    "deeper": [ { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }, x3 ],
-    "cliff":  [ { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }, x3 ]
+    "fast": [
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }
+    ],
+    "deeper": [
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }
+    ],
+    "cliff": [
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }
+    ]
   }
 }
 
