@@ -550,6 +550,35 @@ header {
   }
 
   // ── Text-range finder (for CSS Custom Highlights) ─────────────────────────
+  // Normalise punctuation so extractor-cleaned text matches live DOM:
+  // smart quotes → straight, em/en-dash → hyphen, ellipsis → ..., NBSP → space
+  function normPunct(s) {
+    return s
+      .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+      .replace(/[\u2013\u2014\u2015]/g, "-")
+      .replace(/\u2026/g, "...")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ");
+  }
+
+  function buildCompact(str) {
+    const map = [];
+    let out = "";
+    let prevWS = false;
+    for (let i = 0; i < str.length; i++) {
+      if (/\s/.test(str[i])) {
+        if (!prevWS) { out += " "; map.push(i); }
+        prevWS = true;
+      } else {
+        out += str[i];
+        map.push(i);
+        prevWS = false;
+      }
+    }
+    return { out, map };
+  }
+
   function findTextRange(quote) {
     if (!quote || !supportsHighlight) return null;
     const q = quote.replace(/\s+/g, " ").trim();
@@ -566,40 +595,41 @@ header {
     }
     const combined = chars.map(c => c.node.textContent[c.offset]).join("");
 
-    // Try exact match first
-    let idx = combined.indexOf(q);
-    let len = q.length;
-
-    if (idx === -1) {
-      // Whitespace-collapsed fallback: build compact string + mapping
-      const compactToOrig = [];
-      let compact = "";
-      let prevWS = false;
-      for (let i = 0; i < combined.length; i++) {
-        if (/\s/.test(combined[i])) {
-          if (!prevWS) { compact += " "; compactToOrig.push(i); }
-          prevWS = true;
-        } else {
-          compact += combined[i];
-          compactToOrig.push(i);
-          prevWS = false;
-        }
-      }
-      const ci = compact.indexOf(q);
-      if (ci === -1) return null;
-      idx = compactToOrig[ci];
-      const endOrig = compactToOrig[Math.min(ci + q.length - 1, compactToOrig.length - 1)];
-      len = endOrig - idx + 1;
+    function makeRange(idx, len) {
+      const startC = chars[idx];
+      const endC   = chars[idx + len - 1];
+      if (!startC || !endC) return null;
+      const r = document.createRange();
+      r.setStart(startC.node, startC.offset);
+      r.setEnd(endC.node, endC.offset + 1);
+      return r;
     }
 
-    const startC = chars[idx];
-    const endC   = chars[idx + len - 1];
-    if (!startC || !endC) return null;
+    // Pass 1: exact
+    let idx = combined.indexOf(q);
+    if (idx !== -1) return makeRange(idx, q.length);
 
-    const range = document.createRange();
-    range.setStart(startC.node, startC.offset);
-    range.setEnd(endC.node, endC.offset + 1);
-    return range;
+    // Pass 2: whitespace-collapsed
+    const { out: compact, map: c2o } = buildCompact(combined);
+    let ci = compact.indexOf(q);
+    if (ci !== -1) {
+      idx = c2o[ci];
+      const len = c2o[Math.min(ci + q.length - 1, c2o.length - 1)] - idx + 1;
+      return makeRange(idx, len);
+    }
+
+    // Pass 3: normalise unicode punctuation on both sides, then whitespace-collapse
+    const qn = normPunct(q);
+    const combNorm = normPunct(combined);
+    const { out: compactN, map: cn2o } = buildCompact(combNorm);
+    ci = compactN.indexOf(qn);
+    if (ci !== -1) {
+      idx = cn2o[ci];
+      const len = cn2o[Math.min(ci + qn.length - 1, cn2o.length - 1)] - idx + 1;
+      return makeRange(idx, len);
+    }
+
+    return null;
   }
 
   // ── Highlight state + helpers ─────────────────────────────────────────────
