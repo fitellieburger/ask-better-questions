@@ -644,8 +644,8 @@ header {
     if (!supportsHighlight) return;
     CSS.highlights.delete("abq-hl");
     CSS.highlights.delete("abq-active");
-    hlRanges = items.map(item => findTextRange(item.quote));
-    console.log("[ABQ] quotes:", items.map(i => i.quote));
+    hlRanges = items.map(item => findTextRange(item.excerpt));
+    console.log("[ABQ] excerpts:", items.map(i => i.excerpt));
     console.log("[ABQ] ranges:", hlRanges);
     const valid = hlRanges.filter(Boolean);
     if (valid.length) CSS.highlights.set("abq-hl", new Highlight(...valid));
@@ -668,7 +668,7 @@ header {
         <p class="item-text">${escHtml(item.text)}</p>
         <p class="item-why">${escHtml(item.why)}</p>
       `;
-      if (supportsHighlight && item.quote) {
+      if (supportsHighlight && item.excerpt) {
         li.style.cursor = "pointer";
         li.addEventListener("click", () => {
           const range = hlRanges[itemIdx];

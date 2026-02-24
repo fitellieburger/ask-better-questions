@@ -197,9 +197,9 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "items": [
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string }
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "excerpt": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "excerpt": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "excerpt": string }
   ]
 }
 
@@ -240,7 +240,7 @@ Item rules:
 - Each text MUST be a question that ends with "?".
 - Each text: ${rules.qWords} words, one sentence.
 - Each why: ${rules.whyWords} words, ends with ".".
-- Each quote: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
+- Each excerpt: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
 - Grade 5–7 reading level. Common words only. Calm, humane language.
 - Prefer third-person framing ("the author," "the text," "the reader").
 - Focus on the author/outlet's choices (headline, staging, attribution), not scoring a target.
@@ -401,19 +401,19 @@ Schema:
   "meta": { "neutrality": number, "heat": number, "support": number },
   "bundle": {
     "fast": [
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string }
     ],
     "deeper": [
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string }
     ],
     "cliff": [
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string },
-      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string },
+      { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "excerpt": string }
     ]
   }
 }
@@ -428,7 +428,7 @@ HARD STRUCTURE RULES (ALL THREE SETS):
 - Each set must contain exactly 3 items.
 - Labels must be exactly one each: "Words", "Proof", "Missing" (in any order).
 - why must be present for every item, ends with ".".
-- quote: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
+- excerpt: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
 - Grade 5–7 reading level. Common words only. Calm, humane language.
 - Prefer third-person framing ("the author," "the text," "the reader") and be specific.
 - Focus on the author/outlet's choices (headline, staging, attribution), not scoring a target.
@@ -587,9 +587,9 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "items": [
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string }
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "excerpt": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "excerpt": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "excerpt": string }
   ]
 }
 
@@ -606,7 +606,7 @@ STRICT cliff rules:
 - text MUST NOT start with: What, How, Why, Where, Is, Are, Does, Do.
 - Keep each text 6–12 words.
 - Each why 8–14 words, ends with ".".
-- Each quote: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
+- Each excerpt: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
 - Calm, humane language. No "who's right" declarations.
 - Focus on outlet/author choices first.
 

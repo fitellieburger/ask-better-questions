@@ -65,24 +65,24 @@ const ARTICLE_TEXT =
   "Critics argued no environmental review had been completed before the vote. " +
   "The mayor signed the ordinance into law the following morning without comment.";
 
-/** A well-formed bundle response with quote fields on every item. */
-const VALID_BUNDLE_WITH_QUOTES = {
+/** A well-formed bundle response with excerpt fields on every item. */
+const VALID_BUNDLE_WITH_EXCERPTS = {
   meta: { neutrality: 70, heat: 40, support: 75 },
   bundle: {
     fast: [
-      { label: "Words",   text: "Does the headline use a charged verb here?",  why: "Charged verbs prime readers before the article begins.", quote: "voted 5–4 last Tuesday to approve" },
-      { label: "Proof",   text: "What does the text show to back this claim?", why: "Without shown evidence, readers accept framing as fact.",   quote: "Officials said the change would allow" },
-      { label: "Missing", text: "What standard or comparison is left out?",    why: "Absent benchmarks make it hard to gauge the significance.", quote: "no environmental review had been completed" },
+      { label: "Words",   text: "Does the headline use a charged verb here?",  why: "Charged verbs prime readers before the article begins.", excerpt: "voted 5–4 last Tuesday to approve" },
+      { label: "Proof",   text: "What does the text show to back this claim?", why: "Without shown evidence, readers accept framing as fact.",   excerpt: "Officials said the change would allow" },
+      { label: "Missing", text: "What standard or comparison is left out?",    why: "Absent benchmarks make it hard to gauge the significance.", excerpt: "no environmental review had been completed" },
     ],
     deeper: [
-      { label: "Words",   text: "Which label or phrasing steers the reader's first impression here?", why: "Early framing anchors how readers interpret everything.", quote: "voted 5–4 last Tuesday to approve" },
-      { label: "Proof",   text: "What specific evidence does the article provide for its central claim?", why: "Concrete evidence lets readers evaluate rather than accept.", quote: "Officials said the change would allow" },
-      { label: "Missing", text: "What scope or limit on the story's claim goes unstated by the author?", why: "Without limits, readers may generalise beyond what text shows.", quote: "no environmental review had been completed" },
+      { label: "Words",   text: "Which label or phrasing steers the reader's first impression here?", why: "Early framing anchors how readers interpret everything.", excerpt: "voted 5–4 last Tuesday to approve" },
+      { label: "Proof",   text: "What specific evidence does the article provide for its central claim?", why: "Concrete evidence lets readers evaluate rather than accept.", excerpt: "Officials said the change would allow" },
+      { label: "Missing", text: "What scope or limit on the story's claim goes unstated by the author?", why: "Without limits, readers may generalise beyond what text shows.", excerpt: "no environmental review had been completed" },
     ],
     cliff: [
-      { label: "Words",   text: "The author frames the vote with evaluative language.", why: "Evaluative framing signals interpretation before evidence.", quote: "voted 5–4 last Tuesday to approve" },
-      { label: "Proof",   text: "Key claims rest on official statements, not records.",  why: "Official statements may differ from documented outcomes.",  quote: "Officials said the change would allow" },
-      { label: "Missing", text: "No dissenting expert voice is included.",               why: "One-sided sourcing limits independent reader judgment.",   quote: "no environmental review had been completed" },
+      { label: "Words",   text: "The author frames the vote with evaluative language.", why: "Evaluative framing signals interpretation before evidence.", excerpt: "voted 5–4 last Tuesday to approve" },
+      { label: "Proof",   text: "Key claims rest on official statements, not records.",  why: "Official statements may differ from documented outcomes.",  excerpt: "Officials said the change would allow" },
+      { label: "Missing", text: "No dissenting expert voice is included.",               why: "One-sided sourcing limits independent reader judgment.",   excerpt: "no environmental review had been completed" },
     ],
   },
 };
@@ -558,28 +558,28 @@ describe("POST /api/questions — question item validation", () => {
 // Quote field passthrough
 // ---------------------------------------------------------------------------
 
-describe("POST /api/questions — quote field passthrough", () => {
-  it("includes quote on items when model returns it", async () => {
-    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(VALID_BUNDLE_WITH_QUOTES)));
+describe("POST /api/questions — excerpt field passthrough", () => {
+  it("includes excerpt on items when model returns it", async () => {
+    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(VALID_BUNDLE_WITH_EXCERPTS)));
     const events = await readStream(
       await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
     );
 
     const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
-    const bundle = result!.data.bundle as Record<string, Array<{ quote?: string }>>;
-    expect(bundle.fast[0].quote).toBe("voted 5–4 last Tuesday to approve");
-    expect(bundle.cliff[2].quote).toBe("no environmental review had been completed");
+    const bundle = result!.data.bundle as Record<string, Array<{ excerpt?: string }>>;
+    expect(bundle.fast[0].excerpt).toBe("voted 5–4 last Tuesday to approve");
+    expect(bundle.cliff[2].excerpt).toBe("no environmental review had been completed");
   });
 
-  it("omits quote on items when model does not return it", async () => {
+  it("omits excerpt on items when model does not return it", async () => {
     mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(VALID_BUNDLE)));
     const events = await readStream(
       await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
     );
 
     const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
-    const bundle = result!.data.bundle as Record<string, Array<{ quote?: string }>>;
-    expect(bundle.fast[0].quote).toBeUndefined();
+    const bundle = result!.data.bundle as Record<string, Array<{ excerpt?: string }>>;
+    expect(bundle.fast[0].excerpt).toBeUndefined();
   });
 });
 
