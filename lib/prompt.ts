@@ -400,9 +400,9 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "bundle": {
-    "fast":   [ {label,text,why,quote} x3 ],
-    "deeper": [ {label,text,why,quote} x3 ],
-    "cliff":  [ {label,text,why,quote} x3 ]
+    "fast":   [ { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }, x3 ],
+    "deeper": [ { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }, x3 ],
+    "cliff":  [ { "label": "Words"|"Proof"|"Missing", "text": string, "why": string, "quote": string }, x3 ]
   }
 }
 
