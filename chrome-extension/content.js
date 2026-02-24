@@ -426,7 +426,7 @@ header {
   // Close button
   s.getElementById("abq-close").addEventListener("click", () => {
     clearHighlights();
-    document.head.getElementById("abq-hl-style")?.remove();
+    document.getElementById("abq-hl-style")?.remove();
     document.body.style.paddingTop = host.dataset.savedPaddingTop ?? "";
     host.remove();
   });
