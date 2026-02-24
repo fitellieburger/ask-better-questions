@@ -92,7 +92,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1;
+  z-index: 10;
   transition: border-color 0.15s, color 0.15s;
 }
 #abq-close:hover { border-color: #FFD700; color: #FFD700; }
@@ -707,8 +707,7 @@ header {
     port.onMessage.addListener((event) => {
       if (event.type === "progress") {
         if (event.stage === "__alive__") {
-          // Both services already up — skip warmup, show minimal loading state
-          hideWarmup();
+          wuStatus.textContent = "Analyzing…";
           statusEl.textContent = "Analyzing…";
         } else {
           wuStatus.textContent = event.stage;

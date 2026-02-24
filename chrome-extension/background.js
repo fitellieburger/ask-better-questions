@@ -76,7 +76,7 @@ chrome.runtime.onConnect.addListener((port) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(120_000), // 2 min: app cold start + extractor + OpenAI
+        signal: AbortSignal.timeout(180_000), // 3 min: app cold start + extractor cold start + OpenAI
       });
     } catch (err) {
       clearTimeout(wakeTimer);
