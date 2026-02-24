@@ -392,9 +392,9 @@ header {
   </div>
   <div id="abq-results" class="hidden">
     <div class="abq-tabs" role="tablist">
-      <button class="abq-tab active" data-tab="fast"   role="tab">Fast</button>
-      <button class="abq-tab"        data-tab="deeper" role="tab">Deeper</button>
-      <button class="abq-tab"        data-tab="cliff"  role="tab">Cliff</button>
+      <button class="abq-tab active" data-tab="fast"   role="tab">Questions</button>
+      <button class="abq-tab"        data-tab="deeper" role="tab">Curiosity</button>
+      <button class="abq-tab"        data-tab="cliff"  role="tab">Cues</button>
     </div>
     <ul id="abq-items"></ul>
     <div id="abq-meter" class="abq-meter hidden">
@@ -495,11 +495,16 @@ header {
   let barPct = 0;
   let barTimer = null;
 
-  function startBar() {
+  function startBar(interval = 700) {
     barTimer = setInterval(() => {
       barPct = Math.min(90, barPct + 5);
       wuFill.style.width = barPct + "%";
-    }, 700);
+    }, interval);
+  }
+
+  function slowBar() {
+    stopBar();
+    startBar(1400); // half speed during server warmup
   }
 
   function stopBar() {
@@ -758,6 +763,7 @@ header {
           wuStatus.textContent = "Analyzing…";
           statusEl.textContent = "Analyzing…";
         } else {
+          if (event.stage === "Waking up server…") slowBar();
           wuStatus.textContent = event.stage;
           statusEl.textContent = event.stage;
         }
