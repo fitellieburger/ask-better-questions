@@ -20,7 +20,7 @@ type Mode = PromptMode; // prompt.ts should now include "bundle"
 type Label = "Words" | "Proof" | "Missing";
 type Meta = { neutrality: number; heat: number; support: number };
 
-type NormalizedItem = { label: Label; text: string; why: string };
+type NormalizedItem = { label: Label; text: string; why: string; quote?: string };
 
 /**
  * Meter is a UI-ready summary value.
@@ -287,7 +287,10 @@ function normalizeItems(rawItems: unknown, mode: Exclude<Mode, "bundle">): Norma
       if (!text.endsWith("?")) throw new Error("Question must end with '?'.");
     }
 
-    return { label: it.label, text, why };
+    const quote =
+      typeof it.quote === "string" && it.quote.trim() ? it.quote.trim() : undefined;
+
+    return { label: it.label, text, why, quote };
   });
 }
 

@@ -6,6 +6,18 @@
   // ── Guard: prevent double-injection ──────────────────────────────────────
   if (document.getElementById("abq-host")) return;
 
+  // ── CSS Custom Highlights (non-destructive in-page text marking) ──────────
+  const supportsHighlight = typeof CSS !== "undefined" && !!CSS.highlights;
+  if (supportsHighlight) {
+    const hlStyle = document.createElement("style");
+    hlStyle.id = "abq-hl-style";
+    hlStyle.textContent = `
+      ::highlight(abq-hl)     { background-color: rgba(255,215,0,0.22); }
+      ::highlight(abq-active) { background-color: rgba(255,215,0,0.65); }
+    `;
+    document.head.appendChild(hlStyle);
+  }
+
   // ── Panel sizing ──────────────────────────────────────────────────────────
   const isMobile    = window.innerWidth < 768;
   const panelHeight = Math.floor(window.innerHeight * (isMobile ? 0.5 : 1 / 3));
@@ -413,6 +425,8 @@ header {
 
   // Close button
   s.getElementById("abq-close").addEventListener("click", () => {
+    clearHighlights();
+    document.head.getElementById("abq-hl-style")?.remove();
     document.body.style.paddingTop = host.dataset.savedPaddingTop ?? "";
     host.remove();
   });
@@ -514,18 +528,127 @@ header {
     startBar();
   }
 
+  // ── Fit panel height to content (cap at 50 % of viewport) ────────────────
+  // Temporarily collapse the flex-grown items list so mainEl.scrollHeight
+  // reflects the true content height rather than the stretched height.
+  function fitResultsToContent() {
+    requestAnimationFrame(() => {
+      itemsEl.style.flex = "none";
+      itemsEl.style.overflowY = "visible";
+
+      const natural = mainEl.scrollHeight;
+
+      itemsEl.style.flex = "";
+      itemsEl.style.overflowY = "";
+
+      const maxPx = Math.floor(window.innerHeight * 0.5);
+      const newH  = Math.min(natural, maxPx);
+
+      host.style.height = newH + "px";
+      document.body.style.paddingTop = newH + "px";
+    });
+  }
+
+  // ── Text-range finder (for CSS Custom Highlights) ─────────────────────────
+  function findTextRange(quote) {
+    if (!quote || !supportsHighlight) return null;
+    const q = quote.replace(/\s+/g, " ").trim();
+    if (!q) return null;
+
+    // Walk all text nodes outside the extension panel
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const chars = [];
+    let n;
+    while ((n = walker.nextNode())) {
+      if (host.contains(n)) continue;
+      const t = n.textContent;
+      for (let i = 0; i < t.length; i++) chars.push({ node: n, offset: i });
+    }
+    const combined = chars.map(c => c.node.textContent[c.offset]).join("");
+
+    // Try exact match first
+    let idx = combined.indexOf(q);
+    let len = q.length;
+
+    if (idx === -1) {
+      // Whitespace-collapsed fallback: build compact string + mapping
+      const compactToOrig = [];
+      let compact = "";
+      let prevWS = false;
+      for (let i = 0; i < combined.length; i++) {
+        if (/\s/.test(combined[i])) {
+          if (!prevWS) { compact += " "; compactToOrig.push(i); }
+          prevWS = true;
+        } else {
+          compact += combined[i];
+          compactToOrig.push(i);
+          prevWS = false;
+        }
+      }
+      const ci = compact.indexOf(q);
+      if (ci === -1) return null;
+      idx = compactToOrig[ci];
+      const endOrig = compactToOrig[Math.min(ci + q.length - 1, compactToOrig.length - 1)];
+      len = endOrig - idx + 1;
+    }
+
+    const startC = chars[idx];
+    const endC   = chars[idx + len - 1];
+    if (!startC || !endC) return null;
+
+    const range = document.createRange();
+    range.setStart(startC.node, startC.offset);
+    range.setEnd(endC.node, endC.offset + 1);
+    return range;
+  }
+
+  // ── Highlight state + helpers ─────────────────────────────────────────────
+  let hlRanges = []; // parallel to rendered items array
+
+  function applyHighlights(items) {
+    if (!supportsHighlight) return;
+    CSS.highlights.delete("abq-hl");
+    CSS.highlights.delete("abq-active");
+    hlRanges = items.map(item => findTextRange(item.quote));
+    const valid = hlRanges.filter(Boolean);
+    if (valid.length) CSS.highlights.set("abq-hl", new Highlight(...valid));
+  }
+
+  function clearHighlights() {
+    if (!supportsHighlight) return;
+    CSS.highlights.delete("abq-hl");
+    CSS.highlights.delete("abq-active");
+    hlRanges = [];
+  }
+
   // ── Render helpers ────────────────────────────────────────────────────────
   function renderItems(items) {
     itemsEl.innerHTML = "";
-    for (const item of items) {
+    items.forEach((item, itemIdx) => {
       const li = document.createElement("li");
       li.innerHTML = `
         <span class="item-label label-${item.label}">${item.label}</span>
         <p class="item-text">${escHtml(item.text)}</p>
         <p class="item-why">${escHtml(item.why)}</p>
       `;
+      if (supportsHighlight && item.quote) {
+        li.style.cursor = "pointer";
+        li.addEventListener("click", () => {
+          const range = hlRanges[itemIdx];
+          if (!range) return;
+          // Pulse: brighten this range, then restore all dim highlights
+          CSS.highlights.delete("abq-hl");
+          CSS.highlights.set("abq-active", new Highlight(range));
+          range.startContainer.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => {
+            CSS.highlights.delete("abq-active");
+            const valid = hlRanges.filter(Boolean);
+            if (valid.length) CSS.highlights.set("abq-hl", new Highlight(...valid));
+          }, 1200);
+        });
+      }
       itemsEl.appendChild(li);
-    }
+    });
   }
 
   function renderMeter(meter) {
@@ -542,11 +665,15 @@ header {
       bundle = { [data.mode]: data.items };
       currentTab = data.mode;
     }
-    renderItems(bundle[currentTab] ?? bundle[Object.keys(bundle)[0]]);
+    const activeItems = bundle[currentTab] ?? bundle[Object.keys(bundle)[0]];
+    renderItems(activeItems);
+    applyHighlights(activeItems);
     renderMeter(data.meter);
+    statusEl.textContent = "";
     hideWarmup();
     hide(choiceEl);
     show(resultsEl);
+    fitResultsToContent();
   }
 
   function showError(msg) {
@@ -564,6 +691,8 @@ header {
       currentTab = key;
       tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === key));
       renderItems(bundle[key]);
+      applyHighlights(bundle[key]);
+      fitResultsToContent();
     });
   });
 

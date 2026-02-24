@@ -163,3 +163,28 @@ describe("buildPrompt — Words item priority", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quote field
+// ---------------------------------------------------------------------------
+
+describe("buildPrompt — quote field", () => {
+  it("includes quote field in schema for every mode", () => {
+    for (const mode of ALL_MODES) {
+      // fast/deeper/cliff use `"quote": string`; bundle uses shorthand `{...quote}`
+      expect(buildPrompt(ARTICLE, mode)).toMatch(/["']?quote["']?/);
+    }
+  });
+
+  it("instructs verbatim extraction (exact words) in every mode", () => {
+    for (const mode of ALL_MODES) {
+      expect(buildPrompt(ARTICLE, mode)).toContain("Exact words");
+    }
+  });
+
+  it("specifies 5–20 word length for quotes in every mode", () => {
+    for (const mode of ALL_MODES) {
+      expect(buildPrompt(ARTICLE, mode)).toContain("5–20 words");
+    }
+  });
+});

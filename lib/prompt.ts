@@ -197,9 +197,9 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "items": [
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string }
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string }
   ]
 }
 
@@ -221,7 +221,7 @@ Heat:
 Support:
 - Support measures whether key claims are paired with concrete support/explanation IN THIS TEXT.
 - In local/first-person pieces, do NOT penalize support for being personal.
-  Score support on bridges, separation of observation vs inference, and whether claims stay within what’s shown.
+  Score support on bridges, separation of observation vs inference, and whether claims stay within what's shown.
   Lower support when observation collapses into interpretation without a bridge, or when motive/intent is asserted without a bridge.
 
 IMPORTANT:
@@ -240,9 +240,10 @@ Item rules:
 - Each text MUST be a question that ends with "?".
 - Each text: ${rules.qWords} words, one sentence.
 - Each why: ${rules.whyWords} words, ends with ".".
+- Each quote: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
 - Grade 5–7 reading level. Common words only. Calm, humane language.
-- Prefer third-person framing (“the author,” “the text,” “the reader”).
-- Focus on the author/outlet’s choices (headline, staging, attribution), not scoring a target.
+- Prefer third-person framing ("the author," "the text," "the reader").
+- Focus on the author/outlet's choices (headline, staging, attribution), not scoring a target.
 - Do NOT invent missing evidence. Instead of asking 'what support...?', ask if support exists in the text.
 - ${rules.extra}
 
@@ -399,9 +400,9 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "bundle": {
-    "fast":   [ {label,text,why} x3 ],
-    "deeper": [ {label,text,why} x3 ],
-    "cliff":  [ {label,text,why} x3 ]
+    "fast":   [ {label,text,why,quote} x3 ],
+    "deeper": [ {label,text,why,quote} x3 ],
+    "cliff":  [ {label,text,why,quote} x3 ]
   }
 }
 
@@ -415,9 +416,10 @@ HARD STRUCTURE RULES (ALL THREE SETS):
 - Each set must contain exactly 3 items.
 - Labels must be exactly one each: "Words", "Proof", "Missing" (in any order).
 - why must be present for every item, ends with ".".
+- quote: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
 - Grade 5–7 reading level. Common words only. Calm, humane language.
-- Prefer third-person framing (“the author,” “the text,” “the reader”) and be specific.
-- Focus on the author/outlet’s choices (headline, staging, attribution), not scoring a target.
+- Prefer third-person framing ("the author," "the text," "the reader") and be specific.
+- Focus on the author/outlet's choices (headline, staging, attribution), not scoring a target.
 - Do NOT invent missing evidence. Instead of asking 'what support...?', ask 'if' support exists in the text.
 - Do not give away the answers too soon! Ask how words make the user feel, or what they imply. Use why section to present your assessment.
 
@@ -573,9 +575,9 @@ Schema:
 {
   "meta": { "neutrality": number, "heat": number, "support": number },
   "items": [
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string },
-    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string }
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string },
+    { "label": "Words" | "Proof" | "Missing", "text": string, "why": string, "quote": string }
   ]
 }
 
@@ -592,7 +594,8 @@ STRICT cliff rules:
 - text MUST NOT start with: What, How, Why, Where, Is, Are, Does, Do.
 - Keep each text 6–12 words.
 - Each why 8–14 words, ends with ".".
-- Calm, humane language. No “who’s right” declarations.
+- Each quote: copy the shortest verbatim phrase (5–20 words) from the article that most directly prompted this item. Exact words only, no paraphrase.
+- Calm, humane language. No "who's right" declarations.
 - Focus on outlet/author choices first.
 
 Cue guidance (aligned with Questions):
