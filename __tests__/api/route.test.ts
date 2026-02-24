@@ -469,7 +469,7 @@ describe("POST /api/questions — cliff cue validation", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "error" }));
   });
 
-  it("rejects cliff cues that do not end with '.'", async () => {
+  it("auto-appends '.' to cliff cues that are missing it", async () => {
     const bad = {
       ...VALID_BUNDLE,
       bundle: {
@@ -486,7 +486,9 @@ describe("POST /api/questions — cliff cue validation", () => {
       await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
     );
 
-    expect(events).toContainEqual(expect.objectContaining({ type: "error" }));
+    const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
+    const cliff = (result!.data.bundle as Record<string, Array<{ text: string }>>).cliff;
+    expect(cliff[0].text).toBe("The author frames events with evaluative language.");
   });
 });
 

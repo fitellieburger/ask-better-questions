@@ -285,7 +285,13 @@ function normalizeItems(rawItems: unknown, mode: Exclude<Mode, "bundle">): Norma
 
     if (mode === "cliff") {
       if (text.includes("?")) throw new Error("Cliff cue contains '?'.");
-      if (!text.endsWith(".")) throw new Error("Cliff cue must end with '.'.");
+      // Auto-append period if model omitted it
+      return {
+        label: it.label,
+        text: text.endsWith(".") ? text : text + ".",
+        why,
+        excerpt: typeof it.excerpt === "string" && it.excerpt.trim() ? it.excerpt.trim() : undefined,
+      };
     } else {
       if (!text.endsWith("?")) throw new Error("Question must end with '?'.");
     }
