@@ -176,8 +176,10 @@ async function extractFromUrl(url: string): Promise<ExtractResponse> {
 
   if (!r.ok) {
     const msg = await r.text();
-     console.error("Extractor error:", r.status, msg.slice(0, 800));
-    throw new Error(`Extractor failed: ${msg}`);
+    console.error("Extractor error:", r.status, msg.slice(0, 800));
+    if (r.status === 429) throw new Error("The article fetcher is busy — please wait a moment and try again.");
+    if (r.status >= 500) throw new Error("The article fetcher is temporarily unavailable. Please try again shortly.");
+    throw new Error(`Could not fetch the article (${r.status}). Check the URL and try again.`);
   }
 
   return (await r.json()) as ExtractResponse;
