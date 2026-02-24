@@ -640,6 +640,8 @@ header {
     CSS.highlights.delete("abq-hl");
     CSS.highlights.delete("abq-active");
     hlRanges = items.map(item => findTextRange(item.quote));
+    console.log("[ABQ] quotes:", items.map(i => i.quote));
+    console.log("[ABQ] ranges:", hlRanges);
     const valid = hlRanges.filter(Boolean);
     if (valid.length) CSS.highlights.set("abq-hl", new Highlight(...valid));
   }
