@@ -46,7 +46,9 @@ chrome.action.onClicked.addListener(async (tab) => {
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "abq-analyze") return;
 
-  port.onMessage.addListener(async ({ url, chosenUrl }) => {
+  port.onMessage.addListener(async (msg) => {
+    if (msg.type === "ping") return; // keepalive ping from content script — ignore
+    const { url, chosenUrl } = msg;
     // If both services respond within 3s they're already awake — skip the warmup.
     // Otherwise, fall through to the "Waking up server…" message after 5s.
     const wakeTimer = setTimeout(() => {

@@ -737,7 +737,18 @@ header {
     const port = chrome.runtime.connect({ name: "abq-analyze" });
     let settled = false;
 
+    // Ping every 20 s to prevent the MV3 service worker being killed mid-request
+    const keepalive = setInterval(() => {
+      try { port.postMessage({ type: "ping" }); } catch {}
+    }, 20_000);
+
+    function settle() {
+      settled = true;
+      clearInterval(keepalive);
+    }
+
     port.onDisconnect.addListener(() => {
+      clearInterval(keepalive);
       if (!settled) showError("Connection lost — please try again.");
     });
 
@@ -752,12 +763,12 @@ header {
         }
 
       } else if (event.type === "result") {
-        settled = true;
+        settle();
         port.disconnect();
         showResults(event.data);
 
       } else if (event.type === "choice") {
-        settled = true;
+        settle();
         port.disconnect();
         hideWarmup();
         candidatesEl.innerHTML = "";
@@ -778,7 +789,7 @@ header {
         show(choiceEl);
 
       } else if (event.type === "error") {
-        settled = true;
+        settle();
         port.disconnect();
         showError(event.error + (event.detail ? ` — ${event.detail}` : ""));
       }
