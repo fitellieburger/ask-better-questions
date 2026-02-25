@@ -7,6 +7,24 @@ const API_URL = "https://ask-better-questions.onrender.com/api/questions";
 const APP_HEALTH_URL       = "https://ask-better-questions.onrender.com/api/health";
 const EXTRACTOR_HEALTH_URL = "https://ask-better-questions-vrjh.onrender.com/health";
 
+// ── Auto-start: inject content.js after user navigates from a choice pick ──
+const autoStartTabs = new Set();
+
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg.type === "abq-auto-start" && sender.tab?.id) {
+    autoStartTabs.add(sender.tab.id);
+  }
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (changeInfo.status !== "complete") return;
+  if (!autoStartTabs.has(tabId)) return;
+  autoStartTabs.delete(tabId);
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  } catch {}
+});
+
 // ── Panel toggle ──────────────────────────────────────────────────────────
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.id) return;

@@ -778,16 +778,14 @@ header {
         port.disconnect();
         hideWarmup();
         candidatesEl.innerHTML = "";
-        const sourceUrl = event.data.sourceUrl;
         for (const c of event.data.candidates) {
           const li  = document.createElement("li");
           const btn = document.createElement("button");
           btn.textContent = c.title || c.url;
           btn.title = c.url;
           btn.addEventListener("click", () => {
-            hide(choiceEl);
-            showWarmup();
-            runAnalysis(sourceUrl, c.url);
+            chrome.runtime.sendMessage({ type: "abq-auto-start" });
+            window.location.href = c.url;
           });
           li.appendChild(btn);
           candidatesEl.appendChild(li);
