@@ -12,23 +12,40 @@ import type {RootStackParamList} from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Analysis'>;
 
-export function AnalysisScreen({route}: Props) {
+export function AnalysisScreen({route, navigation}: Props) {
   const urlFromNav = route.params?.url;
   const {phase, run} = useAnalysis();
 
+  // Update header title to reflect current phase
   useEffect(() => {
-    // Cold launch from share sheet: read the URL the OS delivered
-    ShareMenuReactView.getInitialShare().then(
-      (share: {data?: string} | null) => {
-        const url = share?.data ?? urlFromNav;
-        if (url && /^https?:\/\//.test(url)) {
-          run(url);
-        } else if (urlFromNav) {
-          // nav param that isn't a URL (shouldn't happen, but fallback)
-          run(urlFromNav);
-        }
-      },
-    );
+    if (phase.kind === 'result') {
+      navigation.setOptions({title: 'Results'});
+    } else if (phase.kind === 'choice') {
+      navigation.setOptions({title: 'Choose article'});
+    } else if (phase.kind === 'error') {
+      navigation.setOptions({title: 'Error'});
+    } else {
+      navigation.setOptions({title: 'Analyzing…'});
+    }
+  }, [phase.kind, navigation]);
+
+  useEffect(() => {
+    if (urlFromNav) {
+      // Navigated here from the URL input — run directly, skip share menu
+      run(urlFromNav);
+    } else {
+      // Cold launch from share sheet: read the URL the OS delivered
+      ShareMenuReactView.getInitialShare()
+        .then((share: {data?: string} | null) => {
+          const url = share?.data;
+          if (url && /^https?:\/\//.test(url)) {
+            run(url);
+          }
+        })
+        .catch(() => {
+          // No initial share — opened directly, nothing to do
+        });
+    }
 
     // Foreground / background share while the app is already open
     const listener = ShareMenuReactView.addNewShareListener(

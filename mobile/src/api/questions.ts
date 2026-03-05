@@ -82,7 +82,8 @@ export async function analyzeUrl(
           candidates: event.data.candidates,
         };
       } else if (event.type === 'error') {
-        result = {type: 'error', error: event.error};
+        const msg = event.detail ? `${event.error} (${event.detail})` : event.error;
+        result = {type: 'error', error: msg};
       }
     } catch {
       // skip malformed lines

@@ -1,14 +1,15 @@
 import React, {useState} from 'react';
 import {FlatList, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {ChallengeCard} from '../components/ChallengeCard';
 import {ItemCard} from '../components/ItemCard';
 import {MeterBar} from '../components/MeterBar';
 import {tokens} from '../theme/tokens';
 import type {Bundle, Item, Meter} from '../types/api';
 
 const TABS: {key: keyof Bundle; label: string}[] = [
-  {key: 'fast', label: 'Fast'},
-  {key: 'deeper', label: 'Deeper'},
-  {key: 'cliff', label: 'Cliff'},
+  {key: 'fast', label: 'Quick'},
+  {key: 'deeper', label: 'Curious'},
+  {key: 'cliff', label: 'Answers'},
 ];
 
 interface Props {
@@ -44,7 +45,12 @@ export function ResultsScreen({bundle, meter}: Props) {
         keyExtractor={(_, i) => String(i)}
         renderItem={({item}) => <ItemCard item={item} />}
         contentContainerStyle={styles.list}
-        ListFooterComponent={meter ? <MeterBar meter={meter} /> : null}
+        ListFooterComponent={
+          <>
+            {meter && <MeterBar meter={meter} />}
+            <ChallengeCard tab={activeTab} />
+          </>
+        }
       />
     </View>
   );

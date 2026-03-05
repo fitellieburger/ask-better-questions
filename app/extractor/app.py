@@ -244,8 +244,9 @@ async def fetch_html(url: str) -> str:
         return cached
 
     headers = {
-        "User-Agent": "AskBetterQuestionsExtractor/1.0 (+local dev)",
-        "Accept": "text/html,application/xhtml+xml",
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
     }
     timeout = httpx.Timeout(12.0, connect=6.0)
 
@@ -382,7 +383,9 @@ async def extract(req: ExtractRequest, request: Request) -> ExtractResponse:
 
     _check_extractor_key(request)
     ip = _client_ip(request)
-    _rate_limit(ip)
+    # Authenticated requests come from our trusted Next.js service; skip IP rate limit
+    if not EXTRACTOR_KEY:
+        _rate_limit(ip)
 
     if not _is_public_http_url(url):
         raise HTTPException(status_code=400, detail="URL must be http(s) "

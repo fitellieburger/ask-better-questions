@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {
+  Keyboard,
   StyleSheet,
   Text,
   TextInput,
@@ -20,12 +21,12 @@ export function HomeScreen({navigation}: Props) {
     if (!trimmed) {
       return;
     }
+    Keyboard.dismiss();
     navigation.navigate('Analysis', {url: trimmed});
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Ask Better Questions</Text>
       <Text style={styles.subtitle}>
         Paste an article URL to analyze it, or share one from your browser.
       </Text>
@@ -59,13 +60,6 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.bg,
     padding: 24,
     justifyContent: 'center',
-  },
-  logo: {
-    color: tokens.yellow,
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 8,
   },
   subtitle: {
     color: tokens.muted,
