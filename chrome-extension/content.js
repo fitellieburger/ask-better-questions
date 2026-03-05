@@ -19,8 +19,12 @@
   }
 
   // ── Panel sizing ──────────────────────────────────────────────────────────
-  const isMobile    = window.innerWidth < 768;
-  const panelHeight = Math.floor(window.innerHeight * (isMobile ? 0.5 : 1 / 3));
+  const isMobile = window.innerWidth < 768;
+  const maxHeight = Math.floor(window.innerHeight * (isMobile ? 0.5 : 1 / 3));
+  // CSS-derived natural height for 3 result cards:
+  //   header (39) + tabs (36) + items (20px padding + 3×99px cards + 2×8px gaps = 333) = 408
+  const naturalHeight = 408;
+  const panelHeight = Math.min(naturalHeight, maxHeight);
 
   // ── Host element (pushes page content down) ───────────────────────────────
   const host = document.createElement("div");
@@ -335,28 +339,6 @@ header {
 .item-text { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--fg); }
 .item-why  { font-size: 11px; color: var(--muted); line-height: 1.4; }
 
-/* Meter */
-.abq-meter {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px 12px;
-  flex-shrink: 0;
-}
-.meter-track {
-  flex: 1;
-  height: 6px;
-  background: var(--border);
-  border-radius: 99px;
-  overflow: hidden;
-}
-.meter-fill {
-  height: 100%;
-  background: var(--yellow);
-  border-radius: 99px;
-  transition: width 0.4s ease;
-}
-.meter-lbl { font-size: 11px; color: var(--muted); white-space: nowrap; }
 </style>
 
 <!-- Close button (always visible) -->
@@ -397,10 +379,6 @@ header {
       <button class="abq-tab"        data-tab="cliff"  role="tab">Cues</button>
     </div>
     <ul id="abq-items"></ul>
-    <div id="abq-meter" class="abq-meter hidden">
-      <div class="meter-track"><div id="abq-meter-fill" class="meter-fill"></div></div>
-      <span id="abq-meter-lbl" class="meter-lbl"></span>
-    </div>
   </div>
 </div>
 `;
@@ -418,9 +396,6 @@ header {
   const candidatesEl = s.getElementById("abq-candidates");
   const resultsEl    = s.getElementById("abq-results");
   const itemsEl      = s.getElementById("abq-items");
-  const meterEl      = s.getElementById("abq-meter");
-  const meterFill    = s.getElementById("abq-meter-fill");
-  const meterLbl     = s.getElementById("abq-meter-lbl");
   const tabs         = s.querySelectorAll(".abq-tab");
 
   // Close button
@@ -436,9 +411,20 @@ header {
   let currentTab = "fast";
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /** Removes the "hidden" class from an element, making it visible. */
   const show = el => el.classList.remove("hidden");
+
+  /** Adds the "hidden" class to an element, hiding it via `display: none`. */
   const hide = el => el.classList.add("hidden");
 
+  /**
+   * Escapes a string for safe insertion as HTML text content.
+   * Prevents XSS when setting innerHTML with article-derived text.
+   *
+   * @param {string} str - Raw string to escape.
+   * @returns {string} HTML-safe string with &, <, >, and " escaped.
+   */
   function escHtml(str) {
     return str
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -469,6 +455,13 @@ header {
   let slideIdx = 0;
   let tickerTimer = null;
 
+  /**
+   * Displays a single warmup ticker slide with a settle-in animation.
+   * Forces a reflow between removing and re-adding the animation class
+   * so the CSS animation restarts on each slide change.
+   *
+   * @param {string} html - The HTML string for the slide (trusted static content).
+   */
   function showSlide(html) {
     tickerPanel.classList.remove("settle-in");
     void tickerPanel.offsetWidth; // reflow to restart animation
@@ -476,17 +469,27 @@ header {
     tickerPanel.classList.add("settle-in");
   }
 
+  /**
+   * Advances the ticker to the next slide, cycling through SLIDES.
+   */
   function nextSlide() {
     showSlide(SLIDES[slideIdx % SLIDES.length]);
     slideIdx++;
   }
 
+  /**
+   * Starts the warmup ticker: shows the first slide immediately, then
+   * advances every 5.2 seconds after a 2.6-second initial delay.
+   */
   function startTicker() {
     showSlide(SLIDES[0]);
     slideIdx = 1;
     setTimeout(() => { nextSlide(); tickerTimer = setInterval(nextSlide, 5200); }, 2600);
   }
 
+  /**
+   * Stops the warmup ticker interval and clears the timer reference.
+   */
   function stopTicker() {
     if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = null; }
   }
@@ -495,6 +498,12 @@ header {
   let barPct = 0;
   let barTimer = null;
 
+  /**
+   * Starts the loading bar animation, incrementing fill by 5% per interval
+   * up to a maximum of 90% (the final 10% is filled on completion).
+   *
+   * @param {number} [interval=700] - Milliseconds between each 5% increment.
+   */
   function startBar(interval = 700) {
     barTimer = setInterval(() => {
       barPct = Math.min(90, barPct + 5);
@@ -502,16 +511,28 @@ header {
     }, interval);
   }
 
+  /**
+   * Slows the loading bar to half speed (1400ms interval).
+   * Called when the server is waking up and the request will take longer than usual.
+   */
   function slowBar() {
     stopBar();
     startBar(1400); // half speed during server warmup
   }
 
+  /**
+   * Stops the loading bar interval and clears the timer reference.
+   */
   function stopBar() {
     if (barTimer) { clearInterval(barTimer); barTimer = null; }
   }
 
   // ── Warmup → results transition ───────────────────────────────────────────
+  /**
+   * Transitions from the warmup overlay to the results panel.
+   * Completes the loading bar to 100%, fades out the warmup,
+   * and shows the main results container after a 420ms delay.
+   */
   function hideWarmup() {
     stopTicker();
     stopBar();
@@ -522,6 +543,10 @@ header {
     setTimeout(() => hide(warmupEl), 420);
   }
 
+  /**
+   * Shows the warmup overlay and begins the ticker and loading bar animations.
+   * Resets bar state to 0% before starting. Called at the start of each analysis.
+   */
   function showWarmup() {
     wuFill.style.width = "0%";
     barPct = 0;
@@ -536,6 +561,13 @@ header {
   // ── Fit panel height to content (cap at 50 % of viewport) ────────────────
   // Temporarily collapse the flex-grown items list so mainEl.scrollHeight
   // reflects the true content height rather than the stretched height.
+  /**
+   * Resizes the extension panel to fit its content, capped at 50% of the viewport height.
+   *
+   * Temporarily collapses the flex-grown items list so that `scrollHeight` reflects
+   * the true content height rather than the stretched container height, then applies
+   * the new height to both the host element and the page's body padding.
+   */
   function fitResultsToContent() {
     requestAnimationFrame(() => {
       itemsEl.style.flex = "none";
@@ -546,7 +578,7 @@ header {
       itemsEl.style.flex = "";
       itemsEl.style.overflowY = "";
 
-      const maxPx = Math.floor(window.innerHeight * 0.5);
+      const maxPx = Math.floor(window.innerHeight * (isMobile ? 0.5 : 1 / 3));
       const newH  = Math.min(natural, maxPx);
 
       host.style.height = newH + "px";
@@ -557,6 +589,16 @@ header {
   // ── Text-range finder (for CSS Custom Highlights) ─────────────────────────
   // Normalise punctuation so extractor-cleaned text matches live DOM:
   // smart quotes → straight, em/en-dash → hyphen, ellipsis → ..., NBSP → space
+  /**
+   * Normalises Unicode punctuation to ASCII equivalents so that extractor-cleaned
+   * text can be matched against live DOM text nodes.
+   *
+   * Converts: smart quotes → straight, em/en-dash → hyphen, ellipsis → "...",
+   * non-breaking space → regular space, and collapses repeated whitespace.
+   *
+   * @param {string} s - The string to normalise.
+   * @returns {string} ASCII-normalised string with collapsed whitespace.
+   */
   function normPunct(s) {
     return s
       .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
@@ -567,6 +609,17 @@ header {
       .replace(/\s+/g, " ");
   }
 
+  /**
+   * Collapses all whitespace runs to single spaces and builds an index map
+   * from compact-string positions back to original-string positions.
+   *
+   * Used by `findTextRange` so that whitespace-collapsed search positions
+   * can be mapped back to exact character offsets in the full text.
+   *
+   * @param {string} str - The source string to compact.
+   * @returns {{ out: string, map: number[] }} `out` is the compacted string;
+   *   `map[i]` is the original index corresponding to compact position `i`.
+   */
   function buildCompact(str) {
     const map = [];
     let out = "";
@@ -584,6 +637,20 @@ header {
     return { out, map };
   }
 
+  /**
+   * Finds the DOM Range for a verbatim excerpt string in the page's text nodes.
+   *
+   * Performs three passes in order of strictness:
+   *   1. Exact match against the concatenated DOM text.
+   *   2. Whitespace-collapsed match (handles line-break differences).
+   *   3. Unicode-punctuation-normalised + whitespace-collapsed match (handles
+   *      smart quotes vs. straight quotes, em-dashes vs. hyphens, etc.).
+   *
+   * Skips text nodes inside the extension host element to avoid self-matching.
+   *
+   * @param {string} quote - The excerpt text to locate in the page.
+   * @returns {Range|null} A DOM Range spanning the excerpt, or null if not found.
+   */
   function findTextRange(quote) {
     if (!quote || !supportsHighlight) return null;
     const q = quote.replace(/\s+/g, " ").trim();
@@ -600,6 +667,13 @@ header {
     }
     const combined = chars.map(c => c.node.textContent[c.offset]).join("");
 
+    /**
+     * Creates a DOM Range from a character-array index and length.
+     *
+     * @param {number} idx - Start position in the `chars` array.
+     * @param {number} len - Number of characters to span.
+     * @returns {Range|null} The constructed Range, or null if bounds are invalid.
+     */
     function makeRange(idx, len) {
       const startC = chars[idx];
       const endC   = chars[idx + len - 1];
@@ -640,17 +714,29 @@ header {
   // ── Highlight state + helpers ─────────────────────────────────────────────
   let hlRanges = []; // parallel to rendered items array
 
+  /**
+   * Registers CSS Custom Highlights for all item excerpts in the current set.
+   *
+   * Populates `hlRanges` in parallel with the rendered items array so that
+   * clicking an item can activate its specific highlight. Silently skips items
+   * whose excerpts cannot be located in the DOM. No-ops if the browser does not
+   * support the CSS Custom Highlight API.
+   *
+   * @param {Array<{excerpt?: string}>} items - The rendered item set.
+   */
   function applyHighlights(items) {
     if (!supportsHighlight) return;
     CSS.highlights.delete("abq-hl");
     CSS.highlights.delete("abq-active");
     hlRanges = items.map(item => findTextRange(item.excerpt));
-    console.log("[ABQ] excerpts:", items.map(i => i.excerpt));
-    console.log("[ABQ] ranges:", hlRanges);
     const valid = hlRanges.filter(Boolean);
     if (valid.length) CSS.highlights.set("abq-hl", new Highlight(...valid));
   }
 
+  /**
+   * Removes all CSS Custom Highlights registered by this extension and resets
+   * the `hlRanges` array. Called on panel close and before re-rendering a new set.
+   */
   function clearHighlights() {
     if (!supportsHighlight) return;
     CSS.highlights.delete("abq-hl");
@@ -659,6 +745,17 @@ header {
   }
 
   // ── Render helpers ────────────────────────────────────────────────────────
+  /**
+   * Renders an array of analysis items into the Shadow DOM items list.
+   *
+   * Clears the list before rendering. Each item gets a label badge, text, and
+   * "why" explanation. If the item has an excerpt and the browser supports CSS
+   * Custom Highlights, a click handler is added that pulses the matched highlight
+   * and scrolls it into view for 1.2 seconds.
+   *
+   * @param {Array<{label: string, text: string, why: string, excerpt?: string}>} items
+   *   The analysis items to render.
+   */
   function renderItems(items) {
     itemsEl.innerHTML = "";
     items.forEach((item, itemIdx) => {
@@ -688,13 +785,16 @@ header {
     });
   }
 
-  function renderMeter(meter) {
-    if (!meter) { hide(meterEl); return; }
-    meterFill.style.width = meter.value + "%";
-    meterLbl.textContent  = meter.label;
-    show(meterEl);
-  }
-
+  /**
+   * Handles a successful analysis result from the API.
+   *
+   * Stores the result in `bundle` state (normalising single-mode responses into
+   * the same shape), renders the active tab's items, applies highlights, hides
+   * the warmup overlay, and resizes the panel to fit the content.
+   *
+   * @param {{ mode: string, bundle?: object, items?: Array }} data
+   *   The result payload from the API stream's "result" event.
+   */
   function showResults(data) {
     if (data.mode === "bundle") {
       bundle = data.bundle;
@@ -705,7 +805,6 @@ header {
     const activeItems = bundle[currentTab] ?? bundle[Object.keys(bundle)[0]];
     renderItems(activeItems);
     applyHighlights(activeItems);
-    renderMeter(data.meter);
     statusEl.textContent = "";
     hideWarmup();
     hide(choiceEl);
@@ -713,6 +812,12 @@ header {
     fitResultsToContent();
   }
 
+  /**
+   * Displays a user-facing error message in the panel.
+   * Hides the warmup overlay and shows the error element.
+   *
+   * @param {string} msg - The error message to display.
+   */
   function showError(msg) {
     hideWarmup();
     errorEl.textContent = msg;
@@ -735,6 +840,23 @@ header {
 
   // ── Stream via background service worker ─────────────────────────────────
   // Fetch is done in background.js to avoid mixed-content blocks on HTTPS pages.
+  /**
+   * Connects to the background service worker via a long-lived port and streams
+   * the analysis for the given URL.
+   *
+   * The fetch is delegated to `background.js` to avoid mixed-content blocks on
+   * HTTPS pages. A keepalive ping is sent every 20 seconds to prevent the MV3
+   * service worker from being killed during long requests.
+   *
+   * Dispatches four event types from the port:
+   *   - `progress` — updates status labels; "__alive__" signals server is up.
+   *   - `result`   — passes data to `showResults`.
+   *   - `choice`   — shows the multi-article candidate picker.
+   *   - `error`    — passes message to `showError`.
+   *
+   * @param {string} url - The page URL to analyze.
+   * @param {string|null} chosenUrl - A pre-selected article URL from a candidate list, or null.
+   */
   function runAnalysis(url, chosenUrl) {
     wuStatus.textContent = "Fetching page…";
     statusEl.textContent = "Fetching page…";
@@ -747,6 +869,10 @@ header {
       try { port.postMessage({ type: "ping" }); } catch {}
     }, 20_000);
 
+    /**
+     * Marks the analysis as complete and stops the keepalive ping.
+     * Called before disconnecting the port on any terminal event (result, choice, error).
+     */
     function settle() {
       settled = true;
       clearInterval(keepalive);

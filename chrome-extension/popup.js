@@ -13,9 +13,6 @@ const choicePanel   = document.getElementById("choice-panel");
 const candidateList = document.getElementById("candidate-list");
 const resultsEl     = document.getElementById("results");
 const itemsEl       = document.getElementById("items");
-const meterEl       = document.getElementById("meter");
-const meterBar      = document.getElementById("meter-bar");
-const meterLabel    = document.getElementById("meter-label");
 const tabs          = document.querySelectorAll(".tab");
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -48,6 +45,13 @@ let slideIdx       = 0;
 let lastSlideIdx   = -1;
 let tickerInterval = null;
 
+/**
+ * Displays a single warmup ticker slide with a settle-in animation.
+ * Forces a reflow between removing and re-adding the animation class so
+ * the CSS animation restarts cleanly on each slide change.
+ *
+ * @param {string} html - The HTML string for the slide (trusted static content).
+ */
 function showSlide(html) {
   tickerPanel.classList.remove("settle-in");
   // Trigger reflow to restart animation
@@ -56,6 +60,10 @@ function showSlide(html) {
   tickerPanel.classList.add("settle-in");
 }
 
+/**
+ * Advances the ticker to the next slide, skipping any slide that was just shown
+ * to avoid back-to-back repeats.
+ */
 function nextSlide() {
   let idx = slideIdx % SLIDES.length;
   if (idx === lastSlideIdx) idx = (idx + 1) % SLIDES.length;
@@ -64,6 +72,10 @@ function nextSlide() {
   showSlide(SLIDES[idx]);
 }
 
+/**
+ * Starts the warmup ticker: shows the first slide immediately, then advances
+ * every 5.2 seconds after a 2.6-second initial delay.
+ */
 function startTicker() {
   showSlide(SLIDES[0]);
   slideIdx = 1;
@@ -71,6 +83,9 @@ function startTicker() {
   tickerInterval = setInterval(nextSlide, 5200);
 }
 
+/**
+ * Stops the warmup ticker interval and clears the timer reference.
+ */
 function stopTicker() {
   if (tickerInterval) { clearInterval(tickerInterval); tickerInterval = null; }
 }
@@ -83,6 +98,11 @@ const BAR_STEP     = 5;
 const BAR_CAP      = 90;
 const BAR_TICK_MS  = 700;
 
+/**
+ * Starts the loading bar animation, incrementing fill by BAR_STEP percent
+ * every BAR_TICK_MS milliseconds up to BAR_CAP (90%).
+ * The final 10% is filled when `hideWarmup` completes the bar to 100%.
+ */
 function startBar() {
   barInterval = setInterval(() => {
     barPct = Math.min(BAR_CAP, barPct + BAR_STEP);
@@ -90,12 +110,20 @@ function startBar() {
   }, BAR_TICK_MS);
 }
 
+/**
+ * Stops the loading bar interval and clears the timer reference.
+ */
 function stopBar() {
   if (barInterval) { clearInterval(barInterval); barInterval = null; }
 }
 
 // ── Warmup → results transition ────────────────────────────────────────────
 
+/**
+ * Transitions from the warmup overlay to the results panel.
+ * Completes the loading bar to 100%, fades out the warmup overlay,
+ * and shows the main results container after a 420ms CSS transition.
+ */
 function hideWarmup() {
   stopTicker();
   stopBar();
@@ -110,21 +138,42 @@ function hideWarmup() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+/** Removes the "hidden" class from an element, making it visible. */
 function show(el)  { el.classList.remove("hidden"); }
+
+/** Adds the "hidden" class to an element, hiding it via `display: none`. */
 function hide(el)  { el.classList.add("hidden"); }
 
+/**
+ * Updates the loading stage label in both the warmup overlay and the inline status.
+ *
+ * @param {string} msg - The stage label to display (e.g. "Fetching page…").
+ */
 function setStage(msg) {
   wuStatus.textContent = msg;
   statusInline.textContent = msg;
   show(statusInline);
 }
 
+/**
+ * Displays a user-facing error message in the popup.
+ * Hides the warmup overlay and shows the error element.
+ *
+ * @param {string} msg - The error message to display.
+ */
 function showError(msg) {
   hideWarmup();
   errorEl.textContent = msg;
   show(errorEl);
 }
 
+/**
+ * Escapes a string for safe insertion as HTML text content.
+ * Prevents XSS when setting innerHTML with article-derived text.
+ *
+ * @param {string} str - Raw string to escape.
+ * @returns {string} HTML-safe string with &, <, >, and " escaped.
+ */
 function escHtml(str) {
   return str
     .replace(/&/g, "&amp;")
@@ -133,6 +182,14 @@ function escHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Renders an array of analysis items into the popup items list.
+ *
+ * Clears the list before rendering. Each item gets a label badge, question/cue
+ * text, and a "why" explanation. All article-derived text is HTML-escaped.
+ *
+ * @param {Array<{label: string, text: string, why: string}>} items - Items to render.
+ */
 function renderItems(items) {
   itemsEl.innerHTML = "";
   for (const item of items) {
@@ -146,13 +203,16 @@ function renderItems(items) {
   }
 }
 
-function renderMeter(meter) {
-  if (!meter) { hide(meterEl); return; }
-  meterBar.style.width = meter.value + "%";
-  meterLabel.textContent = meter.label;
-  show(meterEl);
-}
-
+/**
+ * Handles a successful analysis result from the API stream.
+ *
+ * Stores the result in `bundle` state (normalising single-mode responses to the
+ * same shape), renders the active tab's items, and transitions from the warmup
+ * overlay to the results panel.
+ *
+ * @param {{ mode: string, bundle?: object, items?: Array }} data
+ *   The result payload from the stream's "result" event.
+ */
 function showResults(data) {
   if (data.mode === "bundle") {
     bundle = data.bundle;
@@ -162,7 +222,6 @@ function showResults(data) {
   }
 
   renderItems(bundle[currentTab] ?? bundle[Object.keys(bundle)[0]]);
-  renderMeter(data.meter);
 
   hideWarmup();
   hide(choicePanel);
@@ -184,6 +243,22 @@ tabs.forEach(tab => {
 
 // ── NDJSON stream consumer ─────────────────────────────────────────────────
 
+/**
+ * Fetches the analysis for the given URL from the API and processes the NDJSON stream.
+ *
+ * Dispatches four event types:
+ *   - `progress` — updates the stage label via `setStage`.
+ *   - `result`   — passes data to `showResults` and ends the loop.
+ *   - `choice`   — shows the multi-article candidate picker; each candidate button
+ *                  re-invokes `runAnalysis` with the chosen URL.
+ *   - `error`    — passes message to `showError` and ends the loop.
+ *
+ * Uses a ReadableStream reader for progressive rendering. Falls back to an error
+ * message if the API is unreachable or returns a non-OK status.
+ *
+ * @param {string} url - The source page URL (used as the hub URL for candidate re-fetch).
+ * @param {string|null} chosenUrl - A pre-selected article URL from the candidate picker, or null.
+ */
 async function runAnalysis(url, chosenUrl) {
   setStage("Fetching page…");
 
@@ -275,6 +350,13 @@ async function runAnalysis(url, chosenUrl) {
 
 // ── Entry point ────────────────────────────────────────────────────────────
 
+/**
+ * Popup entry point. Reads the `url` and `error` query parameters injected by
+ * the background service worker, starts the warmup visuals, and kicks off analysis.
+ *
+ * Shows a user-facing error if no URL was passed (e.g. the user clicked the extension
+ * on a new tab or browser UI page rather than a web article).
+ */
 (async () => {
   const params = new URLSearchParams(window.location.search);
   const error  = params.get("error");

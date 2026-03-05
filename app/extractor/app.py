@@ -189,7 +189,9 @@ def looks_like_hub_text(text: str) -> bool:
 
 def looks_like_archive_path(url: str) -> bool:
     path = urlparse(url).path.lower()
-    return ("/archive" in path) or ("/sections/" in path) or ("/tag/" in path)
+    HUB_TOKENS = ("/archive", "/sections/", "/tag/", "/category/", "/topics/",
+                  "/subject/", "/keyword/")
+    return any(tok in path for tok in HUB_TOKENS)
 
 
 def score_strength(links: List["LinkCandidate"]) -> Tuple[int, int]:
@@ -210,6 +212,12 @@ def decide_is_multi(url: str, extracted_text: str,
     - If extraction is short, only mark multi when hub signals are strong.
     """
     text_len = len(extracted_text)
+    hubish_text = looks_like_hub_text(extracted_text)
+
+    # Archive/category/section pages: decide before the article-length guard
+    # so that a long extraction on a hub page doesn't falsely clear is_multi.
+    if looks_like_archive_path(url):
+        return (len(links) >= MIN_CANDIDATES) or hubish_text
 
     # If we have a decent article extraction, treat as single.
     if text_len >= MIN_ARTICLE_CHARS:
@@ -223,12 +231,6 @@ def decide_is_multi(url: str, extracted_text: str,
         top_score >= MIN_TOP_SCORE and
         avg_top5 >= MIN_AVG_TOP5
     )
-
-    hubish_text = looks_like_hub_text(extracted_text)
-
-    # Archive/section pages are likely hubs.
-    if looks_like_archive_path(url):
-        return (len(links) >= MIN_CANDIDATES) or hubish_text
 
     # Non-archive pages: require stronger signals
     return strong_link_signals and (text_len <= SHORT_TEXT_CEILING
@@ -350,8 +352,9 @@ def guess_story_links(html: str, base_url: str) -> List[LinkCandidate]:
         path = p.path.lower()
 
         # crude “story-like” path hints
-        if any(token in path for token in ["/news/", "/politics/", "/world/",
-                                           "/story", "/article", "/202"]):
+        if any(token in path for token in ['/news/', '/newsroom/', '/politics/',
+                                           '/world/', '/story', '/article',
+                                           '/202']):
             score += 25
         if path.count("/") >= 3:
             score += 10
@@ -388,9 +391,12 @@ async def extract(req: ExtractRequest, request: Request) -> ExtractResponse:
     html = await fetch_html(url)
     title, text = extract_main_text(html, url)
 
-    # Only guess story links if extraction looks suspicious
+    # Guess story links when extraction is thin OR the URL is a known hub type —
+    # archive/category pages can yield long extractions yet still be hubs.
     links: List[LinkCandidate] = []
-    if req.include_candidates and len(text) < MIN_ARTICLE_CHARS:
+    if req.include_candidates and (
+        len(text) < MIN_ARTICLE_CHARS or looks_like_archive_path(url)
+    ):
         links = guess_story_links(html, url)
 
     is_multi = decide_is_multi(url, text, links)
@@ -403,11 +409,6 @@ async def extract(req: ExtractRequest, request: Request) -> ExtractResponse:
                       snippet=c.snippet)
             for c in links
         ]
-
-    path = urlparse(url).path.lower()
-    if "/archive" in path or "/sections/" in path:
-        if len(links) >= 5:
-            is_multi = True
 
     # Clamp returned text
     text = text[: req.max_chars].strip()

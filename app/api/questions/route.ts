@@ -7,6 +7,12 @@ export const runtime = "nodejs";
 // OpenAI client — lazy singleton so missing API key fails at request time,
 // not at module load (which would crash the dev server before any request).
 let _client: OpenAI | null = null;
+
+/**
+ * Returns the shared OpenAI client instance, creating it on first call.
+ *
+ * @returns {OpenAI} The OpenAI client configured with OPENAI_API_KEY.
+ */
 function getClient(): OpenAI {
   if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   return _client;
@@ -18,31 +24,12 @@ function getClient(): OpenAI {
 type Mode = PromptMode; // prompt.ts should now include "bundle"
 
 type Label = "Words" | "Proof" | "Missing";
-type Meta = { neutrality: number; heat: number; support: number };
 
 type NormalizedItem = { label: Label; text: string; why: string; excerpt?: string };
-
-/**
- * Meter is a UI-ready summary value.
- *
- * UPDATED:
- * - value: 0–100 fill derived from SUPPORT ONLY (curved for perception)
- * - label: friendly bucket based on value
- * - glow: 0–100 intensity derived from HEAT (UI decoration)
- * - wave: boolean for "wavy heat" effect at very high heat
- */
-type Meter = {
-  value: number; // 0–100 fill (support-only, curved)
-  label: "Supported" | "Mixed support" | "Unsupported";
-  glow?: number; // 0–100 (heat-derived decoration)
-  wave?: boolean; // true when heat is very high (e.g., > 80)
-};
 
 type NormalizedOutput = {
   mode: Exclude<Mode, "bundle">; // fast|deeper|cliff
   items: NormalizedItem[];
-  meta?: Meta;
-  meter?: Meter;
 };
 
 type Bundle = {
@@ -54,8 +41,6 @@ type Bundle = {
 type BundledOutput = {
   mode: "bundle";
   bundle: Bundle;
-  meta?: Meta;
-  meter?: Meter;
 };
 
 type ExtractCandidate = {
@@ -94,72 +79,43 @@ type Body = {
 // -----------------------------
 // Small helpers
 // -----------------------------
+
+/**
+ * Coerces an unknown value to a valid Mode string, defaulting to "fast".
+ *
+ * @param {unknown} raw - The raw value from the request body.
+ * @returns {Mode} One of "fast" | "deeper" | "cliff" | "bundle".
+ */
 function parseMode(raw: unknown): Mode {
   return raw === "deeper" || raw === "fast" || raw === "cliff" || raw === "bundle"
     ? raw
     : "fast";
 }
 
+/**
+ * Type guard that checks whether a value is a valid question label.
+ *
+ * @param {unknown} x - The value to check.
+ * @returns {boolean} True if x is "Words", "Proof", or "Missing".
+ */
 function isLabel(x: unknown): x is Label {
   return x === "Words" || x === "Proof" || x === "Missing";
-}
-
-function isMeta(value: unknown): value is Meta {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.neutrality === "number" &&
-    typeof v.heat === "number" &&
-    typeof v.support === "number"
-  );
-}
-
-function clamp0to100(n: number): number {
-  return Math.max(0, Math.min(100, Math.round(n)));
-}
-
-
-// -----------------------------
-// Meter logic (Support fill + Heat glow)
-// -----------------------------
-function clampForMeter(n: number, lo = 10, hi = 95): number {
-  return Math.max(lo, Math.min(hi, Math.round(n)));
-}
-
-function meterLabel(v: number): Meter["label"] {
-  if (v >= 80) return "Supported";
-  if (v >= 55) return "Mixed support";
-  return "Unsupported";
-}
-
-function curveSupportToFill(support: number): number {
-  const s = clamp0to100(support) / 100; // 0..1
-  const anchor = 0.55;
-  const k = 1.0;
-
-  const y = s + k * (s - anchor) * s * (1 - s);
-  const yClamped = Math.max(0, Math.min(1, y));
-  return yClamped * 100;
-}
-
-function computeMeter(meta: Meta): Meter {
-  const support = clamp0to100(meta.support);
-  const heat = clamp0to100(meta.heat);
-
-  const curvedFill = curveSupportToFill(support);
-  const value = clampForMeter(curvedFill, 10, 95);
-
-  return {
-    value,
-    label: meterLabel(value),
-    glow: heat,
-    wave: heat > 80
-  };
 }
 
 // -----------------------------
 // URL extraction
 // -----------------------------
+
+/**
+ * Fetches and extracts article text from the given URL via the extractor microservice.
+ *
+ * If the page is a multi-article listing, the response includes a candidate list
+ * so the client can prompt the user to pick a specific article.
+ *
+ * @param {string} url - The URL of the article or page to extract.
+ * @returns {Promise<ExtractResponse>} Parsed extraction result including text and any candidates.
+ * @throws {Error} On 429 (rate-limited), 5xx (server error), or other non-OK HTTP status.
+ */
 async function extractFromUrl(url: string): Promise<ExtractResponse> {
   const extractorUrl =
     process.env.EXTRACTOR_URL ??
@@ -188,6 +144,16 @@ async function extractFromUrl(url: string): Promise<ExtractResponse> {
 // -----------------------------
 // Model call
 // -----------------------------
+
+/**
+ * Sends a prompt to the OpenAI model and returns the parsed JSON response.
+ *
+ * Uses the Responses API with json_object format and a 30-second abort timeout.
+ *
+ * @param {string} prompt - The fully-built prompt string to send to the model.
+ * @returns {Promise<unknown>} Parsed JSON from the model's first output message.
+ * @throws {Error} If the model returns no message, no text content, or invalid JSON.
+ */
 async function runModel(prompt: string): Promise<unknown> {
   const resp = await getClient().responses.create(
     {
@@ -208,10 +174,7 @@ async function runModel(prompt: string): Promise<unknown> {
     throw new Error("Model did not return text output.");
   }
 
-  const parsed = JSON.parse(content.text);
-  // TEMP: log raw model output to diagnose missing excerpt fields
-  console.log("[ABQ raw]", JSON.stringify(parsed).slice(0, 2000));
-  return parsed;
+  return JSON.parse(content.text);
 }
 
 // -----------------------------
@@ -222,6 +185,16 @@ type ResolveResult =
   | { kind: "needs-choice"; sourceUrl: string; candidates: ExtractCandidate[] }
   | { kind: "error"; message: string };
 
+/**
+ * Resolves the request body into article text, a user-choice prompt, or a validation error.
+ *
+ * In paste mode, validates that the pasted text is at least 80 characters.
+ * In URL mode, calls the extractor and either returns text, requests a user choice
+ * (if the page is a multi-article listing), or returns an error if extraction fails.
+ *
+ * @param {Body} body - The parsed request body.
+ * @returns {Promise<ResolveResult>} Discriminated union: "text" | "needs-choice" | "error".
+ */
 async function resolveInput(body: Body): Promise<ResolveResult> {
   const inputMode = body.inputMode === "url" ? "url" : "paste";
 
@@ -259,6 +232,22 @@ async function resolveInput(body: Body): Promise<ResolveResult> {
 // -----------------------------
 // Normalization helpers
 // -----------------------------
+
+/**
+ * Validates and normalizes the raw items array returned by the model.
+ *
+ * Enforces:
+ * - Exactly 3 items in the array.
+ * - Each item has a valid label ("Words" | "Proof" | "Missing").
+ * - Each item has non-empty `text` (accepting "text", "question", or "cue" keys) and `why`.
+ * - Cliff mode: `text` must not contain "?" and will have a period auto-appended if missing.
+ * - Question modes (fast/deeper): `text` must end with "?".
+ *
+ * @param {unknown} rawItems - The raw array from the model response.
+ * @param {Exclude<Mode, "bundle">} mode - The analysis mode ("fast" | "deeper" | "cliff").
+ * @returns {NormalizedItem[]} Array of exactly 3 validated, normalized items.
+ * @throws {Error} On any schema violation (wrong count, bad label, missing fields, format rules).
+ */
 function normalizeItems(rawItems: unknown, mode: Exclude<Mode, "bundle">): NormalizedItem[] {
   if (!Array.isArray(rawItems) || rawItems.length !== 3) {
     throw new Error("Model returned unexpected shape (need 3 items).");
@@ -305,6 +294,16 @@ function normalizeItems(rawItems: unknown, mode: Exclude<Mode, "bundle">): Norma
   });
 }
 
+/**
+ * Normalizes model output for a single analysis mode (fast, deeper, or cliff).
+ *
+ * Accepts either "items" or "questions" as the array key to tolerate minor model variation.
+ *
+ * @param {unknown} parsed - The raw parsed JSON object from the model.
+ * @param {Exclude<Mode, "bundle">} mode - The active analysis mode.
+ * @returns {NormalizedOutput} Validated output with mode and 3 normalized items.
+ * @throws {Error} If the parsed value is not an object or fails item validation.
+ */
 function normalizeSingle(parsed: unknown, mode: Exclude<Mode, "bundle">): NormalizedOutput {
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error("Model returned non-object JSON.");
@@ -315,19 +314,20 @@ function normalizeSingle(parsed: unknown, mode: Exclude<Mode, "bundle">): Normal
 
   const items = normalizeItems(rawItems, mode);
 
-  const meta = isMeta(obj.meta)
-    ? {
-        neutrality: clamp0to100(obj.meta.neutrality),
-        heat: clamp0to100(obj.meta.heat),
-        support: clamp0to100(obj.meta.support)
-      }
-    : undefined;
-
-  const meter = meta ? computeMeter(meta) : undefined;
-
-  return { mode, items, meta, meter };
+  return { mode, items };
 }
 
+/**
+ * Normalizes model output for bundle mode, which returns all three modes at once.
+ *
+ * Expects the model to return `{ bundle: { fast: [...], deeper: [...], cliff: [...] } }`.
+ * Each sub-array is normalized independently by `normalizeItems`.
+ *
+ * @param {unknown} parsed - The raw parsed JSON object from the model.
+ * @returns {BundledOutput} Validated bundle output containing fast, deeper, and cliff item sets.
+ * @throws {Error} If the parsed value is not an object, the bundle key is missing, or any
+ *   sub-array fails item validation.
+ */
 function normalizeBundle(parsed: unknown): BundledOutput {
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error("Model returned non-object JSON.");
@@ -346,27 +346,21 @@ function normalizeBundle(parsed: unknown): BundledOutput {
   const deeper = normalizeItems(b.deeper, "deeper");
   const cliff = normalizeItems(b.cliff, "cliff");
 
-  const meta = isMeta(obj.meta)
-    ? {
-        neutrality: clamp0to100(obj.meta.neutrality),
-        heat: clamp0to100(obj.meta.heat),
-        support: clamp0to100(obj.meta.support)
-      }
-    : undefined;
-
-  const meter = meta ? computeMeter(meta) : undefined;
-
-  return {
-    mode: "bundle",
-    bundle: { fast, deeper, cliff },
-    meta,
-    meter
-  };
+  return { mode: "bundle", bundle: { fast, deeper, cliff } };
 }
 
 // -----------------------------
 // CORS preflight
 // -----------------------------
+
+/**
+ * Handles CORS preflight OPTIONS requests.
+ *
+ * Allows any origin to POST to this endpoint, enabling use from the Chrome extension
+ * and third-party frontends.
+ *
+ * @returns 204 No Content with CORS headers.
+ */
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
@@ -381,11 +375,31 @@ export async function OPTIONS() {
 // -----------------------------
 // Route handler (streaming NDJSON)
 // -----------------------------
+
+/**
+ * Main POST handler for /api/questions.
+ *
+ * Streams NDJSON events to the client as work progresses:
+ *   - `{ type: "progress", stage: string }` — status updates during fetch/analysis.
+ *   - `{ type: "error", error: string, detail?: string }` — user-facing error with optional detail.
+ *   - `{ type: "choice", data: NeedsChoice }` — sent when the URL resolves to a multi-article page.
+ *   - `{ type: "result", data: NormalizedOutput | BundledOutput }` — final analysis output.
+ *
+ * The stream controller is always closed in `finally`, regardless of success or error.
+ *
+ * @param req - The incoming Next.js request. Body must be JSON matching `Body`.
+ * @returns 200 response with Content-Type: application/x-ndjson and a ReadableStream body.
+ */
 export async function POST(req: Request) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
+      /**
+       * Encodes an event object as a JSON line and enqueues it to the stream.
+       *
+       * @param event - Any serializable event object.
+       */
       function send(event: object) {
         controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
       }

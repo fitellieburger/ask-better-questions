@@ -111,44 +111,6 @@ describe("buildPrompt — bundle schema", () => {
     expect(p).toContain('"cliff"');
   });
 
-  it("bundle prompt instructs a single shared meta block", () => {
-    const p = buildPrompt(ARTICLE, "bundle");
-    // Meta should appear once, shared across sets
-    expect(p).toContain("One meta for all sets");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Scoring framework
-// ---------------------------------------------------------------------------
-
-describe("buildPrompt — scoring framework", () => {
-  it("distinguishes supported from unsupported evaluation in every mode", () => {
-    for (const mode of ALL_MODES) {
-      const p = buildPrompt(ARTICLE, mode);
-      expect(p).toContain("SUPPORTED vs UNSUPPORTED");
-    }
-  });
-
-  it("includes guidance on local / first-person accounts in every mode", () => {
-    for (const mode of ALL_MODES) {
-      expect(buildPrompt(ARTICLE, mode)).toContain("LOCAL / FIRST-PERSON");
-    }
-  });
-
-  it("includes attribution and burden rule in every mode", () => {
-    for (const mode of ALL_MODES) {
-      expect(buildPrompt(ARTICLE, mode)).toContain("ATTRIBUTION + BURDEN RULE");
-    }
-  });
-
-  it("instructs meta scoring to be article-only and frozen after Step 1", () => {
-    for (const mode of ALL_MODES) {
-      const p = buildPrompt(ARTICLE, mode);
-      // cliff uses "Freeze meta now.", other modes use "FREEZE it."
-      expect(p).toMatch(/freeze/i);
-    }
-  });
 });
 
 // ---------------------------------------------------------------------------

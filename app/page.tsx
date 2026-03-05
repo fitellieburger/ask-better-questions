@@ -1,12 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { HelpTip } from "@/app/components/HelpTip";
-import type { CSSProperties } from "react";
-
-type CSSVars = CSSProperties & {
-  [key: `--${string}`]: string | number;
-};
 
 type Label = "Words" | "Proof" | "Missing";
 
@@ -14,19 +9,6 @@ type Item = {
   label: Label;
   text: string;
   why: string;
-};
-
-type Meta = {
-  neutrality: number;
-  heat: number;
-  support: number; // raw model score 0–100
-};
-
-type Meter = {
-  value: number; // 0–100 (support-only, curved on server)
-  label: "Supported" | "Mixed support" | "Unsupported";
-  glow?: number; // 0–100 (heat-derived decoration)
-  wave?: boolean; // true when heat is very high (>80)
 };
 
 type ExtractCandidate = {
@@ -48,8 +30,6 @@ type NeedsChoice = {
 type ApiSuccessSingle = {
   mode: OutputMode;
   items: Item[];
-  meta?: Meta;
-  meter?: Meter;
 };
 
 type Bundle = {
@@ -61,8 +41,6 @@ type Bundle = {
 type ApiSuccessBundle = {
   mode: "bundle";
   bundle: Bundle;
-  meta?: Meta;
-  meter?: Meter;
 };
 
 type ApiError = {
@@ -73,84 +51,24 @@ type ApiError = {
 type ApiResponse = ApiSuccessSingle | ApiSuccessBundle | ApiError | NeedsChoice;
 
 
+/**
+ * Type guard that narrows an ApiResponse to ApiSuccessBundle.
+ *
+ * @param x - Any parsed API response object.
+ * @returns True when the response has `mode: "bundle"` and a `bundle` property.
+ */
 function isBundle(x: ApiResponse): x is ApiSuccessBundle {
   return "mode" in x && x.mode === "bundle" && "bundle" in x;
 }
 
-// Heat “menu” labels
-function heatLabel(heat: number | null): string {
-  if (heat === null) return "—";
-  if (heat >= 85) return "Committed";
-  if (heat >= 70) return "Spicy";
-  if (heat >= 50) return "Warm";
-  return "Mild";
-}
-
-type HeatVars = {
-  vars: CSSVars;
-  band: "mild" | "warm" | "spicy" | "committed";
-};
-
 /**
- * Map raw heat (0–100) to CSS variables for the glow.
- * Visual intent:
- * - Mild / Warm / Spicy / Committed are clearly distinct
- * - Nuance preserved within each band
- * - Heat NEVER affects support fill
+ * Root page component for Ask Better Questions.
+ *
+ * Manages all UI state: input mode (paste/URL), output mode (fast/deeper/cliff),
+ * loading/error states, multi-candidate article selection, and the streamed NDJSON
+ * response from /api/questions. Always requests bundle mode from the API so the
+ * user can switch tabs without re-fetching.
  */
-function heatToCSSVars(
-  heatRaw: number | null,
-  enabled: boolean
-): HeatVars {
-  if (!enabled || heatRaw === null) {
-    return {
-      band: "mild",
-      vars: {
-        "--heatOpacity": 0,
-        "--heatBlur": "0px",
-        "--heatSpread": "0px"
-      }
-    };
-  }
-
-  const h = Math.max(0, Math.min(100, Math.round(heatRaw)));
-
-  // --- Band selection ---
-  const band =
-    h >= 85 ? "committed" :
-    h >= 70 ? "spicy" :
-    h >= 50 ? "warm" :
-    "mild";
-
-  // --- Base look per band (intentionally far apart) ---
-  const base = {
-    mild:      { opacity: 0.10, blur: 6,  spread: 1 },
-    warm:      { opacity: 0.26, blur: 14, spread: 3 },
-    spicy:     { opacity: 0.48, blur: 22, spread: 6 },
-    committed: { opacity: 0.72, blur: 30, spread: 9 }
-  }[band];
-
-  // --- Progress within band (0..1) ---
-  const progress =
-    band === "mild"      ? h / 50 :
-    band === "warm"      ? (h - 50) / 20 :
-    band === "spicy"     ? (h - 70) / 15 :
-                            (h - 85) / 15;
-
-  const t = Math.max(0, Math.min(1, progress));
-  const eased = Math.pow(t, 0.6);
-
-  return {
-    band,
-    vars: {
-      "--heatOpacity": Math.min(0.9, base.opacity + eased * 0.08),
-      "--heatBlur": `${Math.round(base.blur + eased * 6)}px`,
-      "--heatSpread": `${Math.round(base.spread + eased * 3)}px`
-    }
-  };
-}
-
-
 export default function Page() {
   // --- User input ---
   const [inputMode, setInputMode] = useState<"paste" | "url">("paste");
@@ -164,8 +82,6 @@ export default function Page() {
 
   // --- Results ---
   const [items, setItems] = useState<Item[] | null>(null);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [meter, setMeter] = useState<Meter | null>(null);
 
   // --- Multi-story chooser (hub pages) ---
   const [candidates, setCandidates] = useState<ExtractCandidate[] | null>(null);
@@ -179,30 +95,10 @@ export default function Page() {
 
   const openUrl = chosenUrl || (inputMode === "url" ? url.trim() : "");
 
-  // UI-ready meter values from API
-  const meterUI = useMemo(() => {
-    if (!meter) return null;
-
-    const fill = Math.max(0, Math.min(100, Math.round(meter.value)));
-    const glow =
-      typeof meter.glow === "number"
-        ? Math.max(0, Math.min(100, Math.round(meter.glow)))
-        : 0;
-
-    return {
-      fill,
-      label: meter.label,
-      glow,
-      wave: !!meter.wave
-    };
-  }, [meter]);
-
-  // Heat label (menu-style) from raw meta.heat (not the glow)
-  const heatUI = useMemo(() => {
-    const h = typeof meta?.heat === "number" ? Math.max(0, Math.min(100, Math.round(meta.heat))) : null;
-    return { value: h, label: heatLabel(h) };
-  }, [meta]);
-
+  /**
+   * Resets the multi-article candidate chooser.
+   * Called when the user cancels a selection or starts a new input.
+   */
   function clearCandidatesUI() {
     setCandidates(null);
     setChosenUrl("");
@@ -217,13 +113,27 @@ export default function Page() {
     !overLimit &&
     (inputMode === "paste" ? text.trim().length >= 80 : url.trim().length >= 8);
 
+  /**
+   * Sends the article input to /api/questions and streams the NDJSON response.
+   *
+   * Always requests `mode: "bundle"` so all three output sets (fast, deeper, cliff)
+   * are fetched in one call. The active tab's items are set immediately; switching
+   * tabs just reads from the cached `bundle` state.
+   *
+   * Handles three stream event types:
+   *   - `progress` — updates the loading stage label.
+   *   - `choice`   — shows the multi-article candidate picker.
+   *   - `result`   — writes items/bundle to state.
+   *   - `error`    — surfaces a user-facing error message.
+   *
+   * @param opts.chosenUrlOverride - Pre-selected article URL from the candidate picker.
+   * @param opts.urlOverride - Allows overriding the URL field at call time (e.g. from a candidate click).
+   */
   async function onGenerate(opts?: { chosenUrlOverride?: string; urlOverride?: string }) {
     setLoading(true);
     setStage(inputMode === "url" ? "Fetching page…" : "Reading text…");
     setError(null);
     setItems(null);
-    setMeta(null);
-    setMeter(null);
     setBundle(null);
     setShowInfo(false); // ✅ auto-hide when a query is run
 
@@ -288,14 +198,10 @@ export default function Page() {
           } else if (event.type === "result") {
             const data = event.data;
             if (isBundle(data)) {
-              setMeta(data.meta ?? null);
-              setMeter(data.meter ?? null);
               setBundle(data.bundle);
               // Show the currently selected tab immediately
               setItems(data.bundle[mode]);
             } else if ("items" in data) {
-              setMeta(data.meta ?? null);
-              setMeter(data.meter ?? null);
               setItems(data.items);
             }
             setStage(null);
@@ -318,19 +224,6 @@ export default function Page() {
       setLoading(false);
     }
   }
-
-  const meterFill = meterUI ? meterUI.fill : 0;
-
-  const heatVarsResult = useMemo(() => {
-  const heat =
-    typeof meta?.heat === "number"
-      ? meta.heat
-      : null;
-
-  return heatToCSSVars(heat, !!meterUI);
-}, [meta?.heat, meterUI]);
-
-
 
   return (
     <main className="page">
@@ -383,11 +276,6 @@ export default function Page() {
       </ul>
 
       <hr className="infoRule" />
-
-      <p className="infoP">
-        <strong>The Meter</strong> is a quick sense of how much the text shows vs. tells, and how intense the language feels. It’s not a scorecard or a verdict — it’s a glimpse of the text’s signals and vibes, warts and all.
-        
-      </p>
 
       <p className="infoP" style={{ marginBottom: 0 }}>
         <strong>Use:</strong> Read the questions or cues, then go back to the article.
@@ -493,35 +381,6 @@ export default function Page() {
               )}
             </div>
 
-            {/* Meter */}
-            <div className="meterWrap" aria-label="Grounding meter">
-              <div className="meterTop">
-                <HelpTip text="Grounding: how consistently the text shows what it claims.">
-                  <span className="meterLabel">Grounding</span>
-                </HelpTip>
-
-                <HelpTip text="Heat: how intense or charged the language feels (not whether it’s right).">
-                  <span className="meterValue">{` ${heatUI.label}`}</span>
-                </HelpTip>
-              </div>
-
-              <div
-  className={["meterShell", meterUI?.wave ? "heatWave" : ""].join(" ")}
-  style={heatVarsResult.vars}
->
-  <div className="meterBar" role="img" aria-label="Grounding bar">
-    <div className="meterFill" style={{ width: `${meterFill}%` }} />
-  </div>
-
-  <div className="meterGlow" aria-hidden="true" />
-</div>
-
-              {/* Labels beneath the bar: Unsupported -> Supported */}
-              <div className="meterHint">
-                <span>Unsupported</span>
-                <span>Supported</span>
-              </div>
-            </div>
           </div>
 
           {error && <div className="error-box">{error}</div>}

@@ -67,7 +67,6 @@ const ARTICLE_TEXT =
 
 /** A well-formed bundle response with excerpt fields on every item. */
 const VALID_BUNDLE_WITH_EXCERPTS = {
-  meta: { neutrality: 70, heat: 40, support: 75 },
   bundle: {
     fast: [
       { label: "Words",   text: "Does the headline use a charged verb here?",  why: "Charged verbs prime readers before the article begins.", excerpt: "voted 5–4 last Tuesday to approve" },
@@ -89,7 +88,6 @@ const VALID_BUNDLE_WITH_EXCERPTS = {
 
 /** A well-formed bundle response matching the schema the route expects. */
 const VALID_BUNDLE = {
-  meta: { neutrality: 70, heat: 40, support: 75 },
   bundle: {
     fast: [
       { label: "Words", text: "Does the headline use a charged verb here?", why: "Charged verbs in headlines prime readers before the article begins." },
@@ -215,28 +213,6 @@ describe("POST /api/questions — paste mode bundle result", () => {
     expect(bundle.cliff).toHaveLength(3);
   });
 
-  it("result includes meta with neutrality, heat, support", async () => {
-    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(VALID_BUNDLE)));
-    const events = await readStream(
-      await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
-    );
-
-    const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
-    const meta = result!.data.meta as Record<string, number>;
-    expect(typeof meta.neutrality).toBe("number");
-    expect(typeof meta.heat).toBe("number");
-    expect(typeof meta.support).toBe("number");
-  });
-
-  it("result includes a meter object", async () => {
-    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(VALID_BUNDLE)));
-    const events = await readStream(
-      await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
-    );
-
-    const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
-    expect(result!.data.meter).toBeDefined();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -371,76 +347,6 @@ describe("POST /api/questions — url mode successful result", () => {
     );
 
     expect(events.map((e) => e.type)).toContain("result");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Meter computation
-// ---------------------------------------------------------------------------
-
-describe("POST /api/questions — meter computation", () => {
-  async function getMeter(meta: { neutrality: number; heat: number; support: number }) {
-    const bundle = { ...VALID_BUNDLE, meta };
-    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(bundle)));
-    const events = await readStream(
-      await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
-    );
-    const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
-    return result!.data.meter as Record<string, unknown>;
-  }
-
-  it('labels high-support article as "Supported"', async () => {
-    const meter = await getMeter({ neutrality: 80, heat: 30, support: 90 });
-    expect(meter.label).toBe("Supported");
-  });
-
-  it('labels mid-range article as "Mixed support"', async () => {
-    const meter = await getMeter({ neutrality: 60, heat: 50, support: 60 });
-    expect(meter.label).toBe("Mixed support");
-  });
-
-  it('labels low-support article as "Unsupported"', async () => {
-    const meter = await getMeter({ neutrality: 30, heat: 70, support: 15 });
-    expect(meter.label).toBe("Unsupported");
-  });
-
-  it("sets wave=true when heat > 80", async () => {
-    const meter = await getMeter({ neutrality: 70, heat: 90, support: 70 });
-    expect(meter.wave).toBe(true);
-  });
-
-  it("sets wave=false when heat <= 80", async () => {
-    const meter = await getMeter({ neutrality: 70, heat: 60, support: 70 });
-    expect(meter.wave).toBe(false);
-  });
-
-  it("clamps meter fill value between 10 and 95", async () => {
-    // Extreme support values
-    for (const support of [0, 100]) {
-      const meter = await getMeter({ neutrality: 50, heat: 50, support });
-      expect(meter.value as number).toBeGreaterThanOrEqual(10);
-      expect(meter.value as number).toBeLessThanOrEqual(95);
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Meta score clamping
-// ---------------------------------------------------------------------------
-
-describe("POST /api/questions — meta score clamping", () => {
-  it("clamps out-of-range meta scores to 0–100", async () => {
-    const bundle = { ...VALID_BUNDLE, meta: { neutrality: 150, heat: -10, support: 999 } };
-    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify(bundle)));
-    const events = await readStream(
-      await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
-    );
-
-    const result = events.find((e) => e.type === "result") as { data: Record<string, unknown> } | undefined;
-    const meta = result!.data.meta as Record<string, number>;
-    expect(meta.neutrality).toBe(100);
-    expect(meta.heat).toBe(0);
-    expect(meta.support).toBe(100);
   });
 });
 
@@ -609,7 +515,7 @@ describe("POST /api/questions — OpenAI failure handling", () => {
   });
 
   it("streams an error when the model returns an empty bundle", async () => {
-    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify({ meta: VALID_BUNDLE.meta })));
+    mockResponsesCreate.mockResolvedValue(makeModelResponse(JSON.stringify({})));
     const events = await readStream(
       await POST(makeRequest({ inputMode: "paste", text: ARTICLE_TEXT, mode: "bundle" }))
     );
