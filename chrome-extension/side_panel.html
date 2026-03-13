@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="popup.css" />
   <style>
-    /* ── Ticker: first span left, subsequent spans right ── */
+    /* ── Ticker: all spans left-aligned ── */
     .brand-headline {
       display: flex;
       flex-direction: column;
@@ -19,11 +19,8 @@
     .brand-headline .brand-rest {
       display: block;
       margin-left: 0;
+      text-align: left;
     }
-    .brand-headline .brand-ask:first-child,
-    .brand-headline .brand-rest:first-child { text-align: left; }
-    .brand-headline .brand-ask:not(:first-child),
-    .brand-headline .brand-rest:not(:first-child) { text-align: right; }
 
     /* ── Refresh button in results header ── */
     #refresh-btn {
