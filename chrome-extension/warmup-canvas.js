@@ -26,7 +26,7 @@
     H = rect.height;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     particles.forEach(p => {
       p.hx = Math.random() * W;
       p.hy = Math.random() * H;
