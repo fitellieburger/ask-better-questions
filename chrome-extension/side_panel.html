@@ -129,8 +129,8 @@
     .wu-canvas {
       display: block;
       width: 100%;
-      height: clamp(100px, 20vh, 140px);
-      opacity: 0.75;
+      height: clamp(160px, 28vh, 220px);
+      opacity: 0.4;
       pointer-events: none;
       -webkit-mask-image: linear-gradient(
         to bottom,
@@ -158,11 +158,11 @@
   <!-- ── Warmup overlay (shown while Render is cold-starting) ── -->
   <div id="warmup">
     <div class="wu-shell">
+      <canvas id="wu-canvas" class="wu-canvas" aria-hidden="true"></canvas>
       <div class="wu-ticker">
         <div id="ticker-panel" class="ticker-panel"></div>
         <div id="not-article" class="hidden"></div>
       </div>
-      <canvas id="wu-canvas" class="wu-canvas" aria-hidden="true"></canvas>
       <div class="wu-bar-row">
         <span class="wu-bar-label">Loading</span>
         <div class="wu-bar-track">

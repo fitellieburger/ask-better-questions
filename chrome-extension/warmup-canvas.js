@@ -7,7 +7,7 @@
   const ctx     = canvas.getContext("2d");
 
   // ── Config ──────────────────────────────────────────────────────────────
-  const COUNT         = 220;   // particle count
+  const COUNT         = 130;   // particle count
   const PARTICLE_W    = 6;     // capsule half-length (px)
   const PARTICLE_H    = 1.5;   // capsule half-width (px)
   const COLOR         = "#FFD700";
