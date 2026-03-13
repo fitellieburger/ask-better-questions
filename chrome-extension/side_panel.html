@@ -125,12 +125,19 @@
     .item-why  { display: none; font-size: 11px; color: var(--muted); line-height: 1.4; padding: 0 12px 10px; margin: 0; }
     .abq-item.open .item-why { display: block; }
 
+    /* ── Warmup shell: flex column so canvas fills remaining space ── */
+    #warmup .wu-shell {
+      display: flex;
+      flex-direction: column;
+    }
+
     /* ── Warmup particle canvas ── */
     .wu-canvas {
       display: block;
       width: 100%;
-      height: clamp(160px, 28vh, 220px);
-      opacity: 0.4;
+      flex: 1;
+      min-height: 80px;
+      opacity: 0.2;
       pointer-events: none;
       -webkit-mask-image: linear-gradient(
         to bottom,
@@ -146,10 +153,6 @@
         black calc(100% - 20px),
         transparent 100%
       );
-    }
-
-    @media (max-height: 520px) {
-      .wu-canvas { display: none; }
     }
   </style>
 </head>

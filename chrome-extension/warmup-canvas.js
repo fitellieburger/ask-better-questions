@@ -8,7 +8,7 @@
 
   // ── Config ──────────────────────────────────────────────────────────────
   const COUNT         = 130;   // particle count
-  const PARTICLE_W    = 6;     // capsule half-length (px)
+  const PARTICLE_W    = 18;    // capsule half-length (px)
   const PARTICLE_H    = 1.5;   // capsule half-width (px)
   const COLOR         = "#FFD700";
   const REPEL_RADIUS  = 60;    // px — cursor influence radius
