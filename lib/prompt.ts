@@ -333,6 +333,17 @@ NEVER write "these labels," "these words," "these terms," or "this language" wit
 the specific phrase. If you haven't named a phrase, you haven't followed this rule.
 
 Proof (MOST IMPORTANT FIX):
+- COMMON KNOWLEDGE FILTER (apply first, before anything else):
+  Ask: would a reasonable, informed reader already accept this claim without supporting
+  evidence? If yes — skip it. Do NOT probe established background facts, scientific or
+  historical consensus, institutional descriptions, or events already in the public record.
+  Only target claims that represent the article's own argument, evaluation, interpretation,
+  or conclusion.
+  Skip: "smoking causes cancer," "X is a federal agency," "the Civil War ended in 1865,"
+        "the company filed for bankruptcy," the basic facts of what happened.
+  Target: causal/predictive claims ("this will cause X"), scope or trend claims without
+          data, evaluative assertions about motive or character, the article's overall
+          implied conclusion when it runs ahead of its evidence.
 - First: identify the article's main implied claim or conclusion — the thing a reader will
   believe after reading. Ask whether the text actually supports that, or whether the
   implication runs ahead of the evidence.
@@ -639,6 +650,17 @@ NEVER write "these labels," "these words," "these terms," or "this language" wit
 the specific phrase. If you haven't named a phrase, you haven't followed this rule.
 
 PROOF ITEM — MOST IMPORTANT FIX (applies in every set):
+- COMMON KNOWLEDGE FILTER (apply first, before anything else):
+  Ask: would a reasonable, informed reader already accept this claim without supporting
+  evidence? If yes — skip it. Do NOT probe established background facts, scientific or
+  historical consensus, institutional descriptions, or events already in the public record.
+  Only target claims that represent the article's own argument, evaluation, interpretation,
+  or conclusion.
+  Skip: "smoking causes cancer," "X is a federal agency," "the Civil War ended in 1865,"
+        "the company filed for bankruptcy," the basic facts of what happened.
+  Target: causal/predictive claims ("this will cause X"), scope or trend claims without
+          data, evaluative assertions about motive or character, the article's overall
+          implied conclusion when it runs ahead of its evidence.
 - First: identify the article's main implied claim or conclusion — the thing a reader will
   believe after reading. Ask whether the text actually supports that, or whether the
   implication runs ahead of the evidence.
