@@ -20,6 +20,13 @@ from pydantic import BaseModel, Field  # type: ignore
 
 app = FastAPI(title="ask-better-questions-extractor")
 
+import logging
+if not os.environ.get("EXTRACTOR_KEY"):
+    logging.warning(
+        "EXTRACTOR_KEY is not set — all requests will be IP-rate-limited. "
+        "Set EXTRACTOR_KEY on both the extractor and Next.js services to bypass rate limiting."
+    )
+
 # --- Security / performance knobs ---
 MAX_BYTES = 2_000_000          # 2MB download cap
 CACHE_TTL_SECONDS = 15 * 60    # 15 minutes
@@ -253,6 +260,18 @@ async def fetch_html(url: str) -> str:
     async with httpx.AsyncClient(headers=headers, timeout=timeout,
                                  follow_redirects=True) as client:
         async with client.stream("GET", url) as r:
+            if r.status_code == 403:
+                raise HTTPException(status_code=422,
+                                    detail='This article is restricted or blocked by the website.')
+            if r.status_code == 404:
+                raise HTTPException(status_code=422,
+                                    detail='Article not found — check the URL and try again.')
+            if r.status_code == 429:
+                raise HTTPException(status_code=429,
+                                    detail='The article website is rate-limiting requests. Try again later.')
+            if r.status_code >= 400:
+                raise HTTPException(status_code=422,
+                                    detail=f'The article website returned an error ({r.status_code}).')
             r.raise_for_status()
 
             # Content-Type check (only after we have headers)
