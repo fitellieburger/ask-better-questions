@@ -12,8 +12,9 @@ const barRow        = warmupEl.querySelector(".wu-bar-row");
 const mainEl        = document.getElementById("main");
 const statusInline  = document.getElementById("status-inline");
 const refreshBtn    = document.getElementById("refresh-btn");
-const errorEl       = document.getElementById("error");
-const choicePanel   = document.getElementById("choice-panel");
+const errorEl         = document.getElementById("error");
+const pasteFallbackEl = document.getElementById("paste-fallback");
+const choicePanel     = document.getElementById("choice-panel");
 const candidateList = document.getElementById("candidate-list");
 const resultsEl     = document.getElementById("results");
 const itemsEl       = document.getElementById("items");
@@ -117,6 +118,7 @@ function showWarmup() {
   barPct = 0;
   mainEl.classList.add("hidden");
   hide(errorEl);
+  hide(pasteFallbackEl);
   hide(choicePanel);
   hide(resultsEl);
   hide(statusInline);
@@ -138,6 +140,17 @@ function showError(msg) {
   hideWarmup();
   errorEl.textContent = msg;
   show(errorEl);
+  pasteFallbackEl.innerHTML = `
+    <p class="paste-hint">Can't access this page? Paste the article text:</p>
+    <textarea id="paste-input" rows="5" placeholder="Paste article text here…"></textarea>
+    <button id="paste-submit">Analyze pasted text</button>
+  `;
+  show(pasteFallbackEl);
+  document.getElementById("paste-submit").addEventListener("click", () => {
+    const text = document.getElementById("paste-input").value.trim();
+    if (!text) return;
+    runPasteAnalysis(text);
+  });
 }
 
 function escHtml(str) {
@@ -253,34 +266,7 @@ tabs.forEach(tab => {
 });
 
 // ── NDJSON stream consumer ─────────────────────────────────────────────────
-async function runAnalysis(url, chosenUrl) {
-  setStage("Fetching page…");
-
-  const body = {
-    inputMode: "url",
-    url,
-    mode: "bundle",
-    ...(chosenUrl ? { chosenUrl } : {}),
-  };
-
-  let resp;
-  try {
-    resp = await fetch(CONFIG.apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(180_000),
-    });
-  } catch {
-    showError("Could not reach the API. Check your connection.");
-    return;
-  }
-
-  if (!resp.ok) {
-    showError(`API error ${resp.status}.`);
-    return;
-  }
-
+async function consumeStream(resp) {
   const reader  = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer    = "";
@@ -332,6 +318,54 @@ async function runAnalysis(url, chosenUrl) {
       }
     }
   }
+}
+
+async function runAnalysis(url, chosenUrl) {
+  setStage("Fetching page…");
+
+  const body = {
+    inputMode: "url",
+    url,
+    mode: "bundle",
+    ...(chosenUrl ? { chosenUrl } : {}),
+  };
+
+  let resp;
+  try {
+    resp = await fetch(CONFIG.apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(180_000),
+    });
+  } catch {
+    showError("Could not reach the API. Check your connection.");
+    return;
+  }
+
+  if (!resp.ok) { showError(`API error ${resp.status}.`); return; }
+  await consumeStream(resp);
+}
+
+async function runPasteAnalysis(text) {
+  showWarmup();
+  setStage("Reading text…");
+
+  let resp;
+  try {
+    resp = await fetch(CONFIG.apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inputMode: "paste", text, mode: "bundle" }),
+      signal: AbortSignal.timeout(180_000),
+    });
+  } catch {
+    showError("Could not reach the API. Check your connection.");
+    return;
+  }
+
+  if (!resp.ok) { showError(`API error ${resp.status}.`); return; }
+  await consumeStream(resp);
 }
 
 // ── Smart page detection ───────────────────────────────────────────────────
