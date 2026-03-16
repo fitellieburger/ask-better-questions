@@ -8,14 +8,17 @@
 
   // ── CSS Custom Highlights setup ───────────────────────────────────────────
   const supportsHighlight = typeof CSS !== "undefined" && !!CSS.highlights;
-  if (!supportsHighlight) return; // nothing to do without API support
 
+  // Inject the sentinel element unconditionally so the guard works on re-injection.
+  // Include highlight styles only when the API is supported.
   const hlStyle = document.createElement("style");
   hlStyle.id = "abq-hl-style";
-  hlStyle.textContent = `
-    ::highlight(abq-hl)     { background-color: rgba(255,215,0,0.22); }
-    ::highlight(abq-active) { background-color: rgba(255,215,0,0.65); }
-  `;
+  if (supportsHighlight) {
+    hlStyle.textContent = `
+      ::highlight(abq-hl)     { background-color: rgba(255,215,0,0.22); }
+      ::highlight(abq-active) { background-color: rgba(255,215,0,0.65); }
+    `;
+  }
   document.head.appendChild(hlStyle);
 
   // ── Text normalisation helpers ────────────────────────────────────────────
@@ -125,6 +128,7 @@
    * @param {string[]} excerpts
    */
   function applyHighlights(excerpts) {
+    if (!supportsHighlight) return;
     CSS.highlights.delete("abq-hl");
     CSS.highlights.delete("abq-active");
     hlRanges = excerpts.map(findTextRange);
@@ -134,6 +138,7 @@
 
   /** Removes all registered highlights. */
   function clearHighlights() {
+    if (!supportsHighlight) return;
     CSS.highlights.delete("abq-hl");
     CSS.highlights.delete("abq-active");
     hlRanges = [];
@@ -144,6 +149,7 @@
    * @param {number} index - Index into the hlRanges array.
    */
   function pulseHighlight(index) {
+    if (!supportsHighlight) return;
     const range = hlRanges[index];
     if (!range) return;
     CSS.highlights.delete("abq-hl");

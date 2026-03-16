@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ask Better Questions",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Analyze any news article with critical-thinking questions.",
   "action": {
     "icons": {
@@ -15,7 +15,8 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "sidePanel"],
+  "side_panel": { "default_path": "side_panel.html" },
   "host_permissions": [
     "https://*/*",
     "http://localhost/*"
