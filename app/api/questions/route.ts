@@ -137,6 +137,9 @@ async function extractFromUrl(url: string, onSlow?: () => void): Promise<Extract
     if (e instanceof Error && e.name === "TimeoutError") {
       throw new Error("The article fetcher took too long to respond. Try again in a moment.");
     }
+    if (e instanceof TypeError) {
+      throw new Error("Could not reach the article fetcher. The service may be down — please try again.");
+    }
     throw e;
   } finally {
     if (slowWarn !== undefined) clearTimeout(slowWarn);

@@ -359,7 +359,7 @@ export default function Page() {
                 }}
                 placeholder="Paste a URL…"
               />
-              {extractorReady !== true && (
+              {extractorReady === null && (
                 <p className="warmup-notice">Article fetcher warming up…</p>
               )}
             </>
