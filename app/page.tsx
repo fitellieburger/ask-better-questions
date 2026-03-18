@@ -162,7 +162,7 @@ export default function Page() {
           : { inputMode, url: urlToUse, mode: "bundle" as const, chosenUrl: chosenToUse || undefined };
 
       const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 45_000);
+      const t = setTimeout(() => controller.abort(), 150_000);
 
       const res = await fetch("/api/questions", {
         method: "POST",

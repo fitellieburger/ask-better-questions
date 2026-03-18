@@ -106,58 +106,88 @@ function isLabel(x: unknown): x is Label {
 // URL extraction
 // -----------------------------
 
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [10_000, 10_000];
+const RETRY_MESSAGES = [
+  "Waking up article fetcher — hang tight…",
+  "Still starting up, almost there…",
+];
+
 /**
  * Fetches and extracts article text from the given URL via the extractor microservice.
  *
- * If the page is a multi-article listing, the response includes a candidate list
- * so the client can prompt the user to pick a specific article.
+ * Retries up to 3 times on connection errors (cold start) with progress events between attempts.
  *
  * @param {string} url - The URL of the article or page to extract.
+ * @param {Function} send - Stream send function for emitting progress events.
  * @returns {Promise<ExtractResponse>} Parsed extraction result including text and any candidates.
  * @throws {Error} On 429 (rate-limited), 5xx (server error), or other non-OK HTTP status.
  */
-async function extractFromUrl(url: string, onSlow?: () => void): Promise<ExtractResponse> {
+async function extractFromUrl(url: string, send: (event: object) => void): Promise<ExtractResponse> {
   const extractorUrl =
     process.env.EXTRACTOR_URL ??
     "https://ask-better-questions-vrjh.onrender.com/extract";
 
-  const slowWarn = onSlow ? setTimeout(onSlow, 5_000) : undefined;
-  let r: Response;
-  try {
-    r = await fetch(extractorUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-extractor-key": process.env.EXTRACTOR_KEY ?? ""
-      },
-      body: JSON.stringify({ url, include_candidates: true }),
-      signal: AbortSignal.timeout(35_000)
-    });
-  } catch (e) {
-    if (e instanceof Error && e.name === "TimeoutError") {
-      throw new Error("The article fetcher took too long to respond. Try again in a moment.");
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      send({ type: "progress", stage: RETRY_MESSAGES[attempt - 1] });
+      await new Promise<void>(r => setTimeout(r, RETRY_DELAYS_MS[attempt - 1]));
     }
-    if (e instanceof TypeError) {
-      throw new Error("Could not reach the article fetcher. The service may be down — please try again.");
-    }
-    throw e;
-  } finally {
-    if (slowWarn !== undefined) clearTimeout(slowWarn);
-  }
 
-  if (!r.ok) {
-    let detail: string | undefined;
+    // Slow-warn only on first attempt; retries already show status via RETRY_MESSAGES
+    const slowWarn = attempt === 0
+      ? setTimeout(
+          () => send({ type: "progress", stage: "Waking up article fetcher — hang tight…" }),
+          5_000
+        )
+      : undefined;
+
+    let r: Response;
     try {
-      const text = await r.text();
-      try { detail = (JSON.parse(text) as { detail?: string }).detail; } catch { /* not JSON */ }
-    } catch { /* body unreadable */ }
-    console.error("Extractor error:", r.status, detail);
-    if (r.status === 429) throw new Error(detail ?? "The article fetcher is busy — please wait a moment and try again.");
-    if (r.status >= 500) throw new Error("The article fetcher is temporarily unavailable. Please try again shortly.");
-    throw new Error(detail ?? `Could not fetch the article (${r.status}). Check the URL and try again.`);
+      r = await fetch(extractorUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-extractor-key": process.env.EXTRACTOR_KEY ?? ""
+        },
+        body: JSON.stringify({ url, include_candidates: true }),
+        signal: AbortSignal.timeout(35_000)
+      });
+    } catch (e) {
+      clearTimeout(slowWarn);
+      const isRetryable =
+        e instanceof TypeError ||
+        (e instanceof Error && e.name === "TimeoutError");
+
+      if (isRetryable && attempt < MAX_ATTEMPTS - 1) continue;
+
+      if (e instanceof Error && e.name === "TimeoutError") {
+        throw new Error("The article fetcher took too long to respond. Try again in a moment.");
+      }
+      if (e instanceof TypeError) {
+        throw new Error("Could not reach the article fetcher. The service may be down — please try again.");
+      }
+      throw e;
+    }
+    clearTimeout(slowWarn);
+
+    if (!r.ok) {
+      let detail: string | undefined;
+      try {
+        const text = await r.text();
+        try { detail = (JSON.parse(text) as { detail?: string }).detail; } catch { /* not JSON */ }
+      } catch { /* body unreadable */ }
+      console.error("Extractor error:", r.status, detail);
+      if (r.status === 429) throw new Error(detail ?? "The article fetcher is busy — please wait a moment and try again.");
+      if (r.status >= 500) throw new Error("The article fetcher is temporarily unavailable. Please try again shortly.");
+      throw new Error(detail ?? `Could not fetch the article (${r.status}). Check the URL and try again.`);
+    }
+
+    return (await r.json()) as ExtractResponse;
   }
 
-  return (await r.json()) as ExtractResponse;
+  // TypeScript needs this — loop always returns or throws above
+  throw new Error("Could not reach the article fetcher.");
 }
 
 // -----------------------------
@@ -214,7 +244,7 @@ type ResolveResult =
  * @param {Body} body - The parsed request body.
  * @returns {Promise<ResolveResult>} Discriminated union: "text" | "needs-choice" | "error".
  */
-async function resolveInput(body: Body, onSlow?: () => void): Promise<ResolveResult> {
+async function resolveInput(body: Body, send: (event: object) => void): Promise<ResolveResult> {
   const inputMode = body.inputMode === "url" ? "url" : "paste";
 
   if (inputMode === "paste") {
@@ -234,7 +264,7 @@ async function resolveInput(body: Body, onSlow?: () => void): Promise<ResolveRes
   }
 
   const targetUrl = chosenUrl || url;
-  const extracted = await extractFromUrl(targetUrl, onSlow);
+  const extracted = await extractFromUrl(targetUrl, send);
 
   if (!chosenUrl && extracted.is_multi) {
     return { kind: "needs-choice", sourceUrl: extracted.url, candidates: extracted.candidates ?? [] };
@@ -430,10 +460,7 @@ export async function POST(req: Request) {
 
         send({ type: "progress", stage: inputMode === "url" ? "Fetching page…" : "Reading text…" });
 
-        const slowWarnFn = inputMode === "url"
-          ? () => send({ type: "progress", stage: "Waking up article fetcher — hang tight…" })
-          : undefined;
-        const resolved = await resolveInput(body, slowWarnFn);
+        const resolved = await resolveInput(body, send);
 
         if (resolved.kind === "error") {
           send({ type: "error", error: resolved.message });
